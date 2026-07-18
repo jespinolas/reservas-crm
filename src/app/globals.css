@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Sistema de diseño "Atlas": modo claro sobrio (neutros fríos + un acento).
+  Los tokens de acento (--accent*) se sobreescriben en runtime por el
+  white-label de la organización (Configuración → Marca).
+*/
+@layer base {
+  :root {
+    /* Neutros (valores exactos del handoff) */
+    --bg: #ffffff;
+    --bg-subtle: #fbfbfc;
+    --bg-panel: #f8f8f9;
+    --bg-hover: #f4f4f5;
+    --text: #1a1a1e;
+    --text-2: #56565e;
+    --text-3: #8c8c95;
+    --text-4: #aeaeb6;
+    --border: #ecedf0;
+    --border-strong: #e0e1e6;
+
+    /* Chat */
+    --chat-bg: #f4f5f7;
+    --bubble-out: #f2f5f8;
+    --bubble-out-text: #33414f;
+
+    /* Acento (default: azul acero apagado; white-label lo sobreescribe) */
+    --accent: #3f5972;
+    --accent-hover: #334a60;
+    --accent-soft: #dde5ee;
+    --accent-tint: #f3f6f9;
+    --accent-text: #2b4056;
+    --bg-active: var(--accent-tint);
+
+    /* Estado */
+    --success: #5f8f74;
+    --warning: #b08b5e;
+    --danger: #a2504c;
+
+    /* Radios y sombras */
+    --radius-sm: 7px;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --shadow-sm: 0 1px 2px rgba(20, 20, 30, 0.05);
+    --shadow-md: 0 6px 20px -6px rgba(20, 20, 35, 0.12);
+    --shadow-pop: 0 12px 32px -8px rgba(20, 20, 35, 0.22);
+
+    /* Densidad de filas de conversación */
+    --row-py: 11px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    letter-spacing: -0.01em;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

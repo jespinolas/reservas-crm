@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1783657511753,
+      "tag": "0000_absurd_the_santerians",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784398215241,
+      "tag": "0001_shocking_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784399186209,
+      "tag": "0002_wild_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784399723043,
+      "tag": "0003_real_sunset_bain",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784403919098,
+      "tag": "0004_needy_gorilla_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784404542325,
+      "tag": "0005_gigantic_warbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784405313158,
+      "tag": "0006_panoramic_moondragon",
+      "breakpoints": true
+    }
+  ]
+}
