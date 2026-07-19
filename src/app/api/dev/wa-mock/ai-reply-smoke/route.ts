@@ -80,6 +80,7 @@ export async function POST(req: Request) {
 
   const counts = await countMessages();
   return Response.json({
+    status: "passed",
     ok: true,
     fixture: {
       organizationId: fixture.organizationId,
