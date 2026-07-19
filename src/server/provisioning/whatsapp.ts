@@ -81,6 +81,7 @@ export function verifyWhatsappProvisioningRequest(input: {
   now?: Date;
   maxSkewSeconds?: number;
   allowRawTokenForSmoke?: boolean;
+  resolveTokenSecretRef?: (tokenSecretRef: string) => string | null;
 }): VerifyWhatsappProvisioningResult {
   const signature = input.headers.get("x-reservas-signature");
   const timestamp = input.headers.get("x-reservas-timestamp");
@@ -125,7 +126,14 @@ export function verifyWhatsappProvisioningRequest(input: {
   if (parsed.data.installationId !== installationId) {
     return failure(422, "customer_mismatch", "Installation header does not match body");
   }
-  if (!parsed.data.token || !input.allowRawTokenForSmoke) {
+  let token = parsed.data.token ?? null;
+  if (token && !input.allowRawTokenForSmoke) {
+    return failure(422, "token_unavailable", "Provisioning token material is unavailable");
+  }
+  if (!token && input.resolveTokenSecretRef) {
+    token = input.resolveTokenSecretRef(parsed.data.tokenSecretRef);
+  }
+  if (!token) {
     return failure(422, "token_unavailable", "Provisioning token material is unavailable");
   }
 
@@ -137,7 +145,7 @@ export function verifyWhatsappProvisioningRequest(input: {
       version: whatsappProvisioningVersion,
       displayPhoneNumber: parsed.data.displayPhoneNumber ?? null,
       verifiedName: parsed.data.verifiedName ?? null,
-      token: parsed.data.token,
+      token,
     },
   };
 }

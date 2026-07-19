@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { apiError } from "@/lib/api";
 import { getDb, schema } from "@/lib/db";
 import { getEnv, isMockEnabled } from "@/lib/env";
@@ -28,6 +30,8 @@ export async function POST(req: Request) {
     secret: env.CRM_PROVISIONING_SECRET,
     allowRawTokenForSmoke:
       isMockEnabled() || env.CRM_PROVISIONING_ACCEPT_RAW_TOKEN_SMOKE_ONLY === "true",
+    resolveTokenSecretRef: (tokenSecretRef) =>
+      resolveRuntimeTokenSecret(tokenSecretRef, env.CRM_PROVISIONING_TOKEN_SECRET_DIR),
   });
   if (!result.ok) {
     return apiError(result.status, result.code, result.message);
@@ -61,6 +65,25 @@ export async function POST(req: Request) {
       payload: result.payload,
     })
   );
+}
+
+function resolveRuntimeTokenSecret(
+  tokenSecretRef: string,
+  secretDir: string | undefined
+): string | null {
+  const prefix = "runtime-secret://";
+  if (!secretDir || !tokenSecretRef.startsWith(prefix)) return null;
+
+  const name = tokenSecretRef.slice(prefix.length);
+  if (!/^[A-Za-z0-9._-]+$/.test(name)) return null;
+  if (basename(name) !== name) return null;
+
+  try {
+    const value = readFileSync(join(secretDir, name), "utf8").trim();
+    return value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveSingleOrganization(customerSlug: string): Promise<

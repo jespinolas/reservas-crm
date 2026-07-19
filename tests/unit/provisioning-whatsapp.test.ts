@@ -166,6 +166,34 @@ describe("WhatsApp provisioning auth and payload service", () => {
     });
   });
 
+  it("resolves production token material from a token secret reference", () => {
+    const rawBody = JSON.stringify(
+      payload({
+        token: undefined,
+        tokenSecretRef: "runtime-secret://meta-access-token",
+      })
+    );
+    const result = verifyWhatsappProvisioningRequest({
+      method: "POST",
+      path,
+      rawBody,
+      headers: headers({ rawBody }),
+      secret,
+      now,
+      allowRawTokenForSmoke: false,
+      resolveTokenSecretRef: (ref) =>
+        ref === "runtime-secret://meta-access-token" ? "EAAG-real-token-xyz" : null,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      payload: {
+        token: "EAAG-real-token-xyz",
+        tokenSecretRef: "runtime-secret://meta-access-token",
+      },
+    });
+  });
+
   it("builds redacted success evidence without raw token material", () => {
     const rawBody = JSON.stringify(payload());
     const result = verify(rawBody);

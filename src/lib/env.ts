@@ -21,6 +21,7 @@ const envSchema = z.object({
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(8),
   META_APP_SECRET: z.string().optional(),
   CRM_PROVISIONING_SECRET: z.string().min(16).optional(),
+  CRM_PROVISIONING_TOKEN_SECRET_DIR: z.string().optional(),
   CRM_PROVISIONING_ACCEPT_RAW_TOKEN_SMOKE_ONLY: z.string().optional(),
   META_GRAPH_API_VERSION: z.string().default("v25.0"),
   META_GRAPH_BASE_URL: z.string().url().default("https://graph.facebook.com"),
