@@ -4,7 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+      day: monday
+      time: "09:00"
+      timezone: America/Asuncion
+    open-pull-requests-limit: 2
     groups:
       nextjs:
         patterns:
@@ -15,3 +18,7 @@ updates:
           - react
           - react-dom
           - "@types/react*"
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
