@@ -10,6 +10,24 @@ committed changelog entries, release evidence, and merged pull requests.
 
 ### Added
 
+- Nothing yet.
+
+### Changed
+
+- Nothing yet.
+
+### Fixed
+
+- Nothing yet.
+
+### Security
+
+- Nothing yet.
+
+## [1.1.0-alpha.1] - 2026-07-22
+
+### Added
+
 - Public repository foundation work for CI, branch protection, artifact hygiene,
   and maintenance documentation.
 
@@ -43,5 +61,6 @@ committed changelog entries, release evidence, and merged pull requests.
 - Public security policy and secret-handling expectations for self-hosted
   deployments.
 
-[Unreleased]: https://github.com/jespinolas/reservas-crm/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jespinolas/reservas-crm/compare/v1.1.0-alpha.1...HEAD
+[1.1.0-alpha.1]: https://github.com/jespinolas/reservas-crm/compare/v1.0.0...v1.1.0-alpha.1
 [1.0.0]: https://github.com/jespinolas/reservas-crm/releases/tag/v1.0.0
