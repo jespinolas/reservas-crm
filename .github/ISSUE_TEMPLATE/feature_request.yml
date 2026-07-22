@@ -1,0 +1,43 @@
+name: Feature Request
+description: Suggest an improvement to reservas-crm.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Keep requests focused on the open-source CRM. Do not include private customer data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or operator problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - WhatsApp inbox
+        - AI agent
+        - Reservations
+        - Availability
+        - Google Calendar
+        - Automation outbox
+        - Deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints Or Risks
+      description: Note security, privacy, reservation authority, or deployment concerns.
