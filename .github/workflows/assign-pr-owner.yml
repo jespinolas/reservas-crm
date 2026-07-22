@@ -14,6 +14,10 @@ permissions:
 jobs:
   assign:
     name: Assign jespinolas
+    if: >
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -24,6 +28,8 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           REPOSITORY: ${{ github.repository }}
         run: |
+          # Bot-authored PRs are intentionally skipped at the job level to avoid
+          # noisy assignment notifications from automated dependency updates.
           gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/assignees" \
             -f assignees[]=jespinolas
 
