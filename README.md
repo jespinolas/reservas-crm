@@ -81,6 +81,13 @@ docker compose up -d --build
 Fill `.env` with generated secrets before production use. The example file
 documents each required value and includes generation commands.
 
+Fresh install smoke test:
+
+```bash
+corepack enable
+pnpm smoke:fresh-install
+```
+
 Health check:
 
 ```bash
