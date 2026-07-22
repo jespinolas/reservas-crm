@@ -1,5 +1,11 @@
 # Reservas CRM
 
+[![CI](https://github.com/jespinolas/reservas-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/jespinolas/reservas-crm/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jespinolas/reservas-crm?sort=semver)](https://github.com/jespinolas/reservas-crm/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Security Policy](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
+[![Status](https://img.shields.io/badge/status-alpha--ready-orange.svg)](ROADMAP.md)
+
 Open-source CRM for businesses that run conversations and bookings through
 WhatsApp.
 
