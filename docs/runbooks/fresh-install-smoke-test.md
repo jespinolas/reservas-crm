@@ -8,11 +8,53 @@ Do not use production credentials for this smoke test.
 ## Prerequisites
 
 - Git.
+- Node.js with Corepack or `pnpm`.
 - Docker with Docker Compose.
 - `curl`.
 - A clean temporary directory.
 
 ## Commands
+
+From a fresh clone, run the automated smoke script:
+
+```bash
+git clone https://github.com/jespinolas/reservas-crm.git reservas-crm-smoke
+cd reservas-crm-smoke
+corepack enable
+pnpm smoke:fresh-install
+```
+
+The script generates public-safe placeholder values in a temporary env file,
+uses an isolated Docker Compose project name, maps Caddy to local high ports,
+waits for `/api/health`, verifies migration evidence, and removes containers
+and volumes when it exits.
+
+To inspect a failed stack before cleanup:
+
+```bash
+SMOKE_KEEP_STACK=1 pnpm smoke:fresh-install
+```
+
+Optional local overrides:
+
+```bash
+SMOKE_PROJECT_NAME=reservas-crm-smoke \
+SMOKE_HTTP_PORT=18080 \
+SMOKE_HTTPS_PORT=18443 \
+SMOKE_TIMEOUT_SECONDS=180 \
+pnpm smoke:fresh-install
+```
+
+The health URL used by the script is:
+
+```bash
+curl -fk https://localhost:18443/api/health
+```
+
+## Manual Commands
+
+Use these commands when validating the install path manually or when the
+script is unavailable.
 
 ```bash
 git clone https://github.com/jespinolas/reservas-crm.git reservas-crm-smoke
