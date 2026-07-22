@@ -28,12 +28,19 @@ only in your deployment platform or secret manager.
 
 ## Pull Requests
 
+Work on a branch and open a pull request against `main`. Do not push feature or
+fix work directly to `main`. Maintainers configure the required checks and
+review rules using [`docs/runbooks/branch-protection.md`](docs/runbooks/branch-protection.md).
+
 Before opening a pull request:
 
 - Run `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm build`.
 - Update documentation when installation, configuration, or public behavior changes.
 - Include screenshots for visible UI changes when practical.
 - Explain any skipped verification clearly.
+
+Maintainers triage issues and pull requests using
+[`docs/runbooks/label-taxonomy.md`](docs/runbooks/label-taxonomy.md).
 
 ## Security Issues
 

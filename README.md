@@ -80,6 +80,13 @@ Health check:
 curl https://crm.yourdomain.com/api/health
 ```
 
+Detailed setup and operations:
+
+- [Fresh install smoke test](docs/runbooks/fresh-install-smoke-test.md)
+- [Docker Compose deployment](docs/deployment/docker-compose.md)
+- [Coolify deployment](docs/deployment/coolify.md)
+- [Backups and restores](docs/deployment/backups-and-restores.md)
+
 Local development:
 
 ```bash

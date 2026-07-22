@@ -5,6 +5,16 @@ node_modules
 !.env.example
 *.log
 coverage
+.claude
+.codex
+.specify
+.mcp.json
+.mcp.json.example
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+skills-lock.json
+private-artifacts
 .playwright-mcp
 docs
 specs
@@ -14,4 +24,3 @@ Dockerfile
 docker-compose*.yml
 Caddyfile
 README.md
-INSTALL-IA.md
