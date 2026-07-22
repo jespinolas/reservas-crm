@@ -2,7 +2,7 @@ name: Feature Request
 description: Suggest an improvement to reservas-crm.
 title: "[Feature]: "
 labels:
-  - enhancement
+  - feature
 body:
   - type: markdown
     attributes:

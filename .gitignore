@@ -5,10 +5,33 @@
 *.pem
 *.key
 
-# --- MCP local con tokens (si lo personalizas con secretos en claro) ---
-# .mcp.json se commitea SOLO si usa ${VAR} (sin tokens en claro). Si metes
-# secretos directos, ignóralo y deja únicamente .mcp.json.example.
-# .mcp.json
+# --- AI / assistant tooling artifacts (private, never public) ---
+CLAUDE.md
+.claude/
+.codex/
+.specify/
+.mcp.json
+.mcp.json.example
+skills-lock.json
+AGENTS.md
+GEMINI.md
+.cursor/
+.continue/
+.aider*
+*.prompt.md
+*prompt-log*
+*chat-log*
+*transcript*
+*completion-report*
+
+# --- Local/private planning artifacts ---
+specs/
+private-artifacts/
+docs/getting-started.md
+docs/mcp-setup.md
+docs/sdd-workflow.md
+docs/three-agent-architecture.md
+INSTALL-IA.md
 
 # --- Dependencias / build (cuando el starter ya tenga app encima) ---
 node_modules/
@@ -33,9 +56,5 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
-# --- Claude Code: estado local (no compartir) ---
-# La memoria de subagentes (.claude/agent-memory/) SÍ se versiona (es memoria de
-# proyecto compartida con el equipo). La config local de la sesión, no:
-.claude/settings.local.json
 .playwright-mcp/
 .tmp-seed-demo.mjs

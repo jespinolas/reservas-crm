@@ -1,6 +1,6 @@
 # Guion E2E — US7: Multi-usuario mínimo
 
-> Conducido con Playwright (MCP) contra `pnpm dev` (org ya creada).
+> Conducido con Playwright contra `pnpm dev` (org ya creada).
 
 1. **Registro cerrado (FR-060)**: POST público a sign-up con otra cuenta.
    ✅ 403 con mensaje claro (la UI lo muestra en /register).

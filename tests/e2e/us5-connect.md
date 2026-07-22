@@ -1,6 +1,6 @@
 # Guion E2E — US5: Conexión del número (wizard)
 
-> Conducido con Playwright (MCP) contra `pnpm dev` con wa-mock
+> Conducido con Playwright contra `pnpm dev` con wa-mock
 > (`META_GRAPH_BASE_URL` → wa-mock/graph).
 
 ## Camino feliz

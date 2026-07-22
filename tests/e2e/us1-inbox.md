@@ -1,6 +1,6 @@
 # Guion E2E — US1: Bandeja de WhatsApp en tiempo real
 
-> Conducido con Playwright (MCP) contra `pnpm dev` con el entorno de pruebas
+> Conducido con Playwright contra `pnpm dev` con el entorno de pruebas
 > interno activo (`WA_MOCK_ENABLED=true`, `META_GRAPH_BASE_URL` → wa-mock).
 > Requiere: usuario registrado y número conectado (mock, phoneNumberId `123456789`).
 

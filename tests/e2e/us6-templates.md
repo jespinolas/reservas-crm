@@ -1,6 +1,6 @@
 # Guion E2E — US6: Plantillas acotadas
 
-> Conducido con Playwright (MCP) contra `pnpm dev` con wa-mock.
+> Conducido con Playwright contra `pnpm dev` con wa-mock.
 
 ## Ciclo de aprobación
 
