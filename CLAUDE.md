@@ -1,9 +1,10 @@
-# Vocero CRM — Guía para Claude
+# Reservas CRM — Guía para Claude
 
-Vocero es un CRM de WhatsApp open source (MIT), self-hosted, con agente de IA y
-Laboratorio de auto-evaluación. Una instancia = un negocio. Este archivo guía a
+Reservas CRM es un CRM de WhatsApp open source (MIT), self-hosted, con agente
+de IA, Laboratorio de auto-evaluación y flujos de reserva. Una instancia = un
+negocio. Este archivo guía a
 Claude Code (u otro asistente) para operar y **modificar** este repositorio —
-el caso típico: una agencia adaptando Vocero para un cliente.
+el caso típico: una agencia adaptando Reservas CRM para un cliente.
 
 ## Stack
 

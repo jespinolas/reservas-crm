@@ -1,302 +1,149 @@
-# reservas-crm
+# Reservas CRM
 
-**El CRM de WhatsApp open source con un agente de IA que se pone a prueba solo.**
+Open-source CRM for businesses that run conversations and bookings through
+WhatsApp.
 
-reservas-crm es un CRM self-hosted y gratuito para negocios que venden por WhatsApp:
-bandeja en tiempo real, pipeline de ventas, un agente de IA con el conocimiento
-de tu negocio, un **Laboratorio** donde clientes simulados lo evalúan antes de
-que hable con clientes reales, y flujos de reservas mantenidos por reservas.AI.
-Una instancia = un negocio, en tu propio servidor, con tus datos.
+Reservas CRM is a self-hosted application for teams that want their WhatsApp
+inbox, customer pipeline, AI-assisted replies, reservation workflows, templates,
+and operational data in their own deployment. It is maintained by Martin
+Espinola as the open CRM layer of the reservas.AI ecosystem.
 
-Este proyecto es un fork mantenido de [Vocero CRM](https://github.com/kevinrivm/vocero-crm),
-publicado bajo licencia MIT con atribución upstream preservada.
+One instance is designed for one business: one app, one database, one WhatsApp
+connection, one set of secrets, one operating boundary.
 
-![Bandeja de Vocero CRM](docs/screenshots/bandeja.png)
+![Reservas CRM inbox](docs/screenshots/reservas-inbox.png)
 
 <p align="center">
-  <img src="docs/screenshots/laboratorio.png" width="49%" alt="Laboratorio: reporte con score y hallazgos" />
-  <img src="docs/screenshots/pipeline.png" width="49%" alt="Pipeline kanban" />
+  <img src="docs/screenshots/reservas-reservations.png" width="49%" alt="Reservas CRM reservations" />
+  <img src="docs/screenshots/reservas-settings-about.png" width="49%" alt="Reservas CRM about settings" />
 </p>
 
-> Nota: parte de la documentación y algunas pantallas aún conservan referencias
-> históricas a Vocero mientras continúa el rebranding progresivo.
+## What It Does
 
-## ¿Para quién es?
+- Real-time WhatsApp inbox with contacts, message status, unread counts, human
+  handoff, templates, and 24-hour window handling.
+- Customer pipeline for tracking conversations from first contact to customer,
+  lost lead, or custom stages.
+- AI agent configuration with business knowledge, escalation rules, OpenRouter-
+  compatible model adapters, and a sandbox lab for testing behavior before it
+  replies to real customers.
+- Reservation domain for resources, services, availability, holds,
+  confirmations, reminders, and operational views.
+- Google Calendar and automation-outbox foundations for integrations without
+  making external tools the source of truth.
+- White-label branding per installation: name and accent color can be changed
+  from Settings.
+- Docker-first deployment with PostgreSQL, encrypted WhatsApp credentials, and
+  no required runtime SaaS beyond Meta and an optional LLM provider.
 
-- **Agencias de IA/automatización** que implementan CRM + agente para sus
-  clientes: despliegas una instancia por cliente en su VPS, la configuras y la
-  entregas con evidencia de calidad (el reporte del Laboratorio).
-- **Negocios** que quieren atender WhatsApp con IA sin regalar sus datos a un
-  SaaS: todo corre en tu servidor.
+## Who It Is For
 
-## Features
+- Agencies and implementers deploying one CRM per client.
+- Small and medium businesses that sell, schedule, reserve, or support through
+  WhatsApp.
+- Developers who want a practical open-source base for WhatsApp operations
+  without putting customer conversation data into a shared SaaS database.
 
-### 🧪 Laboratorio: el agente se prueba solo
+## Architecture Principles
 
-La pieza estelar. Seis clientes simulados —el comprador decidido, el preguntón
-de precios, el cliente enojado, el que pregunta lo que no sabes, el que exige
-un humano y el que escribe "ke onda si benden pintura"— conversan contra tu
-agente REAL en un **sandbox interno que jamás envía mensajes reales**. Un juez
-LLM independiente evalúa cada conversación y te entrega:
+- The CRM PostgreSQL database is the authority for reservations, availability,
+  holds, pricing decisions, reminders, payment state, and sync state.
+- AI can interpret intent and call typed tools, but deterministic application
+  code must make authoritative booking decisions.
+- n8n and other automations may consume events, but they must not write directly
+  to CRM reservation tables or become the reservation engine.
+- A deployment should keep each business isolated through separate credentials,
+  database, secrets, volumes, domain, and backup namespace.
 
-- un **score 0–100** de qué tan listo está el agente,
-- **hallazgos con evidencia** (alucinaciones, huecos del conocimiento, fallas
-  de escalado, tono),
-- **sugerencias aplicables con un click** al knowledge base,
-- e **historial con delta**: re-corre después de cada cambio y mira si mejoraste.
+## Quick Start
 
-Deja de "esperar que el bot funcione": mídelo.
+Requirements:
 
-### 💬 Bandeja de WhatsApp en tiempo real
-
-Tres columnas (conversaciones / hilo / contacto), mensajes entrantes en ≤2
-segundos sin recargar, estados enviado/entregado/leído, ventana de 24 horas
-visible y bloqueada correctamente (con envío de plantilla aprobada cuando está
-cerrada), respuestas del agente marcadas como IA y handoff a humano con un
-click.
-
-### 📊 Contactos y pipeline kanban
-
-Cada persona que escribe queda registrada sola y entra al pipeline
-(Nuevo → En conversación → Interesado → Cliente → Perdido, editable). Arrastra
-tarjetas, busca, agrega notas, archiva. El agente puede mover leads de etapa
-cuando detecta intención de compra.
-
-### 🤖 Agente de IA con TU conocimiento
-
-Configura nombre, tono, instrucciones y reglas de escalado; dale conocimiento
-en pares pregunta/respuesta y bloques libres. Responde SOLO con lo que sabe,
-agrupa ráfagas de mensajes en una respuesta, escala a humano cuando el cliente
-lo pide (con detección de respaldo), cuando él lo decide o cuando algo falla.
-Proveedor LLM por adaptador OpenRouter-compatible: usa el modelo que quieras.
-
-### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
-
-Plantillas con una variable y aprobación de Meta sincronizada; cuentas de
-equipo creadas por el propietario (el registro público se cierra tras la
-primera organización); token de WhatsApp cifrado en reposo (AES-256-GCM),
-webhook autenticado en dos capas y cero dependencias de runtime más allá de
-Meta y tu proveedor LLM opcional.
-
-## Requisitos
-
-- Un VPS con Docker (2 GB de RAM bastan) — con o sin [Coolify](https://coolify.io).
-- Un dominio apuntando al VPS (Meta exige **https** para webhooks).
-- Un número de WhatsApp en la Cloud API de Meta (ver [Conexión](#conexión-del-número-de-whatsapp)).
-- Opcional: una API key de [OpenRouter](https://openrouter.ai) (o cualquier
-  proveedor compatible) para el agente y el Laboratorio.
-
-## Instalación (~15 minutos)
-
-### 0. Apunta tu dominio
-
-Crea un registro **A** de `crm.tudominio.com` hacia la IP del VPS y espera a
-que resuelva.
-
-### Ruta A — Coolify guiado por IA (recomendada)
-
-Abre tu asistente de IA (p. ej. Claude Code con el MCP de Coolify), pásale el
-archivo [`INSTALL-IA.md`](INSTALL-IA.md) y responde 3 preguntas (dominio, token
-de OpenRouter opcional, ruta). El asistente crea la base de datos y la app,
-genera los secretos y verifica el healthcheck.
-
-### Ruta B — docker compose
+- Docker on a VPS or local machine.
+- A domain with HTTPS for real WhatsApp webhooks.
+- A WhatsApp Cloud API number for production messaging.
+- Optional OpenRouter-compatible API key for the AI agent and lab.
 
 ```bash
-git clone https://github.com/jespinolas/reservas-crm.git reservas-crm && cd reservas-crm
-cp .env.example .env    # rellena: dominio + secretos (cada uno trae su comando openssl)
+git clone https://github.com/jespinolas/reservas-crm.git
+cd reservas-crm
+cp .env.example .env
 docker compose up -d --build
 ```
 
-Caddy emite el certificado HTTPS solo. Verifica con
-`https://crm.tudominio.com/api/health` → `{"ok":true}`.
+Fill `.env` with generated secrets before production use. The example file
+documents each required value and includes generation commands.
 
-### Primer arranque
-
-1. Entra y **regístrate**: el primer registro crea tu organización y cierra el
-   registro público.
-2. Opcional: pulsa **"Cargar datos de demostración"** para explorar con la
-   **Ferretería El Martillo** (contactos, conversaciones, pipeline, un
-   knowledge base con huecos a propósito y una corrida de Laboratorio de
-   ejemplo — corre el Laboratorio y mira cómo los encuentra).
-3. La conexión de WhatsApp se hace después, en **Configuración → WhatsApp**.
-
-## Conexión del número de WhatsApp
-
-reservas-crm **consume** un token de la WhatsApp Cloud API — no implementa el
-Embedded Signup. Hay dos formas de obtenerlo:
-
-### Modo directo (el negocio tiene su propia app de Meta)
-
-1. Crea una app en [developers.facebook.com](https://developers.facebook.com)
-   con el producto WhatsApp y vincula tu número.
-2. Crea un **usuario del sistema** (Business Settings → System users) con
-   acceso a la WABA y genera un token permanente con permisos
-   `whatsapp_business_messaging` y `whatsapp_business_management`.
-3. En reservas-crm: **Configuración → WhatsApp** → pega WABA ID + Phone Number ID +
-   token → **Probar conexión** → Guardar.
-4. En el panel de Meta (WhatsApp → Configuration → Webhook) pega la **URL del
-   webhook** y el **verify token** que reservas-crm te muestra, y suscribe el campo
-   `messages` (y `message_template_status_update` si usarás plantillas).
-5. Recomendado: agrega `META_APP_SECRET` (App Secret de tu app) a las
-   variables de la instancia para la verificación de firma de cada evento.
-
-### Modo agencia (Tech Provider) — para agencias
-
-Tu plataforma de agencia ya hace el Embedded Signup y guarda los tokens de tus
-clientes; la instancia de reservas-crm del cliente solo recibe su token. El webhook
-del cliente se conecta con el **override de callback por WABA**:
-
-```text
-   Meta (WABA del cliente)
-        │  webhooks (override_callback_uri)
-        ▼
-   ┌────────────────────────────┐      ┌─────────────────────────────┐
-   │  Instancia reservas-crm    │      │  Backend de TU agencia      │
-   │  (VPS del cliente)         │      │  (Embedded Signup + tokens) │
-   │  /api/webhooks/wa/<token>  │      └──────────────┬──────────────┘
-   └────────────▲───────────────┘                     │
-                └────── token del cliente ────────────┘
-                        (pegado en el wizard)
-```
-
-**Checklist de 5 pasos (el orden importa):**
-
-1. **Despliega la instancia primero** (Ruta A o B) — el webhook debe estar en
-   línea para el paso 4.
-2. **Embedded Signup en TU plataforma**: el cliente conecta su número en tu
-   onboarding y tu backend guarda su token (intercambio de código → token).
-3. **Pega las credenciales en el wizard** de la instancia (WABA ID, Phone
-   Number ID, token) → **Probar conexión** → **GUARDAR**. Este paso va ANTES
-   del override: el webhook enruta cada mensaje por el Phone Number ID
-   **guardado** — sin conexión guardada, el handshake del paso 4 pasa igual,
-   pero los mensajes que lleguen se descartan en silencio.
-4. **Configura el override del callback a nivel WABA** hacia la instancia:
-
-   ```http
-   POST https://graph.facebook.com/v25.0/{WABA_ID_DEL_CLIENTE}/subscribed_apps
-   Authorization: Bearer {TOKEN_DEL_CLIENTE}
-   Content-Type: application/json
-
-   {
-     "override_callback_uri": "https://crm.cliente.com/api/webhooks/wa/{VERIFY_TOKEN}",
-     "verify_token": "{VERIFY_TOKEN}"
-   }
-   ```
-
-   La URL y el verify token exactos están en **Configuración → WhatsApp** de la
-   instancia. Meta hace el handshake en ese momento (la URI debe responder, si
-   no devuelve 422).
-5. **Registra el número** en la Cloud API si aún no lo está
-   (`POST /{PHONE_NUMBER_ID}/register`) y manda un mensaje de prueba al número:
-   debe aparecer en la bandeja en uno o dos segundos. Los mensajes del cliente
-   llegan directo a SU instancia, no a tu backend.
-
-> ⚠️ **Seguridad**: la URL del webhook contiene el verify token como segmento
-> secreto — trátala como una contraseña (no la publiques ni la mandes por
-> canales inseguros). En modo directo puedes añadir la capa extra de firma con
-> `META_APP_SECRET`.
->
-> ℹ️ **Limitación conocida de Meta**: los eventos de estado de PLANTILLAS
-> (`message_template_status_update`) no siguen el override de callback — van a
-> la app dueña. Por eso reservas-crm también **sincroniza plantillas por la API de
-> Graph** (botón "Sincronizar" en Configuración → Plantillas), así el modo
-> agencia ve las aprobaciones igual.
-
-## Configuración de la IA
-
-En las variables de la instancia:
+Health check:
 
 ```bash
-OPENROUTER_API_TOKEN=sk-or-...        # tu key
-OPENROUTER_MODEL=anthropic/claude-sonnet-4.5
-OPENROUTER_JUDGE_MODEL=               # opcional: modelo distinto para el juez del Laboratorio
-OPENROUTER_BASE_URL=https://openrouter.ai/api   # o tu proveedor OpenAI-compatible
+curl https://crm.yourdomain.com/api/health
 ```
 
-Sin token, todo lo demás funciona; Agente y Laboratorio muestran cómo
-activarlos. Después configura el comportamiento y el conocimiento en la
-pestaña **Agente** y corre el **Laboratorio** antes de encender el agente con
-clientes reales.
+Local development:
 
-## Cumplimiento con las políticas de Meta
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+docker compose -f docker-compose.dev.yml up -d
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5433/reservas_crm
+pnpm db:migrate
+pnpm dev
+```
 
-1. **Opt-in**: escribe solo a personas que iniciaron la conversación o
-   aceptaron recibir mensajes; reservas-crm respeta la ventana de 24 h y bloquea el
-   texto libre fuera de ella.
-2. **Plantillas aprobadas** para reabrir conversaciones: nada de trucos para
-   saltarse la aprobación de Meta.
-3. **El Laboratorio es 100 % interno**: los clientes simulados jamás tocan la
-   API de WhatsApp (bloqueado por diseño y verificado con tests).
-4. **Sin spam ni broadcast**: reservas-crm no incluye envíos masivos; úsalo para
-   conversaciones reales de venta y soporte.
-5. **Datos del cliente en su servidor**: cada negocio aloja su instancia; el
-   token va cifrado en reposo y los webhooks se validan por URL secreta y
-   firma opcional.
+## First Run
 
-## FAQ de errores comunes
+1. Open the app and create the first account. The first signup creates the
+   business organization and becomes the owner.
+2. Load demo data if you want a populated inbox, pipeline, knowledge base, and
+   lab scenario.
+3. Configure WhatsApp from Settings -> WhatsApp.
+4. Configure the business name and color from Settings -> Brand.
+5. Review upstream credits and license details from Settings -> About.
 
-**El webhook no se verifica en Meta** — El dominio aún no resuelve, no es
-https, o pegaste mal la URL/verify token. Cópialos exactos de Configuración →
-WhatsApp.
+## WhatsApp Connection
 
-**El webhook verificó bien pero no llegan mensajes** — Casi siempre: la
-conexión no está GUARDADA en el wizard (el handshake no la necesita, la
-ingesta sí — enruta por el Phone Number ID guardado). Entra a Configuración →
-WhatsApp, guarda la conexión y reenvía un mensaje. Los logs de la instancia
-muestran una advertencia con el Phone Number ID desconocido.
+Reservas CRM consumes WhatsApp Cloud API credentials. It does not implement
+Meta Embedded Signup inside the CRM.
 
-**Llegan mensajes pero no salen** — Revisa el estado de la conexión en
-Configuración → WhatsApp. Si dice "reconectar", el token expiró: pega uno
-nuevo. En modo directo usa un token de usuario del sistema (no expira).
+Direct mode:
 
-**Error 131030 al enviar** — El número destino no está en la lista de
-permitidos (números de prueba de Meta) o el formato es inválido. reservas-crm ya
-normaliza los números de México (521 → 52).
+1. Create a Meta app with the WhatsApp product.
+2. Generate a system-user token with `whatsapp_business_messaging` and
+   `whatsapp_business_management`.
+3. In Reservas CRM, save the WABA ID, Phone Number ID, and token.
+4. Configure the webhook URL and verify token shown by the CRM.
+5. Set `META_APP_SECRET` in production so webhook signatures are validated.
 
-**El agente no responde** — ¿Token de IA configurado? ¿Toggle global
-encendido? ¿La conversación tiene la IA activa y sin handoff? ¿Ventana de 24 h
-abierta? Revisa también los logs de la instancia.
+Agency/platform mode:
 
-**`ENCRYPTION_KEY` inválida al arrancar** — Debe ser exactamente 32 bytes en
-base64 (44 caracteres): `openssl rand -base64 32`.
+- Your platform performs Embedded Signup and token exchange.
+- The CRM receives only the resulting customer WABA credentials through a
+  protected provisioning path or the manual settings wizard.
+- The customer WABA webhook callback can point directly at that customer's CRM
+  instance.
 
-**La app arranca pero /api/health falla** — La base de datos no está lista o
-`DATABASE_URL` apunta mal; revisa los logs (`docker compose logs app`).
+## Verification
 
-## Roadmap
+```bash
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
+```
 
-- Multimedia completa en la bandeja (hoy: indicador de tipo).
-- RAG para knowledge bases grandes (hoy: se inyecta completo con aviso de tamaño).
-- Personas configurables del Laboratorio y comparativas entre corridas.
-- Variables múltiples y borrado de plantillas.
-- Analytics de conversación y plantillas.
-- Broadcast con opt-in verificado.
+## Security
 
-## Stack
+Do not commit `.env`, tokens, production identifiers, customer data, or
+screenshots containing credentials. Report vulnerabilities privately using
+[`SECURITY.md`](SECURITY.md), not public issues.
 
-Next.js 15 (App Router) + React 19 · TypeScript estricto · PostgreSQL +
-Drizzle ORM · Better Auth · Tailwind CSS · SSE (sin WebSockets) · Docker
-multi-stage con migraciones al arranque. Diseñado para que una agencia lo
-modifique con un asistente de IA: specs y decisiones de diseño en
-[`specs/`](specs/), guía de modificación en [`CLAUDE.md`](CLAUDE.md).
+## Contributing
 
-## Contribuir
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request. Keep
+the CRM self-hosted, preserve customer isolation, and keep reservation authority
+inside deterministic application/database logic.
 
-Lee [`CONTRIBUTING.md`](CONTRIBUTING.md) antes de abrir un PR. No publiques
-secretos, tokens, datos reales de clientes ni detalles explotables de seguridad.
-Para vulnerabilidades, usa [`SECURITY.md`](SECURITY.md).
+## License
 
-## Licencia
-
-[MIT](LICENSE) — úsalo, véndelo instalado, modifícalo. Si te sirve, una ⭐ al
-repo ayuda a que más gente lo encuentre.
-
-## Créditos
-
-reservas-crm es mantenido por Martin Espinola para reservas.AI.
-
-Este proyecto deriva de [Vocero CRM](https://github.com/kevinrivm/vocero-crm),
-creado por [Kevin Belier](https://www.youtube.com/@KevinBelier), a partir del
-commit `c0e7777e929a6e730c268fb449d756ab9877a4c7`. La atribución y licencia MIT
-upstream se preservan en [`LICENSE`](LICENSE) y [`NOTICE`](NOTICE).
+MIT. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

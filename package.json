@@ -1,7 +1,7 @@
 {
   "name": "reservas-crm",
   "version": "1.0.0",
-  "description": "Open-source, self-hosted WhatsApp CRM with AI-assisted conversations and reservation workflows",
+  "description": "Self-hosted WhatsApp CRM for customer conversations, AI-assisted replies, and reservation workflows",
   "license": "MIT",
   "type": "module",
   "private": true,

@@ -39,7 +39,7 @@
 | Variable | Valor |
 |---|---|
 | `APP_BASE_URL` | `https://<dominio>` |
-| `DATABASE_URL` | `postgresql://postgres:<POSTGRES_PASSWORD>@<host-postgres>:5432/vocero` |
+| `DATABASE_URL` | `postgresql://postgres:<POSTGRES_PASSWORD>@<host-postgres>:5432/reservas_crm` |
 | `POSTGRES_PASSWORD` | generado |
 | `BETTER_AUTH_SECRET` | generado |
 | `ENCRYPTION_KEY` | generado (base64, 44 caracteres) |
@@ -53,7 +53,7 @@
 ## Ruta A — Coolify (con el MCP de Coolify)
 
 1. **Base de datos**: crea un servicio PostgreSQL 16 en el proyecto
-   (`database` tipo `postgresql`), con la contraseña generada y base `vocero`.
+   (`database` tipo `postgresql`), con la contraseña generada y base `reservas_crm`.
    Anota su host interno (algo como `<uuid>:5432`).
 2. **Aplicación**: crea una app tipo **repositorio público** apuntando a
    `https://github.com/jespinolas/reservas-crm` (rama `main`, build pack
