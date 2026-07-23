@@ -14,6 +14,7 @@ import type {
   ReservableResource,
   ReservationServiceDefinition,
 } from "@/server/reservations/catalog";
+import type { ReservationResourceDto, ReservationServiceDto } from "@/lib/types";
 
 export const createHoldBodySchema = z.object({
   resourceId: z.string().trim().min(1),
@@ -33,6 +34,8 @@ export interface ReservationApiRepository {
     organizationId: string,
     id: string
   ): Promise<ReservationServiceDefinition | null>;
+  listResources(organizationId: string): Promise<ReservableResource[]>;
+  listReservationServices(organizationId: string): Promise<ReservationServiceDefinition[]>;
   contactExists(organizationId: string, id: string): Promise<boolean>;
 }
 
@@ -85,6 +88,22 @@ export class ReservationApiService {
       now: input.now,
     });
   }
+
+  async listActiveCatalog(input: {
+    organizationId: string;
+  }): Promise<{
+    resources: ReservationResourceDto[];
+    services: ReservationServiceDto[];
+  }> {
+    const [resources, services] = await Promise.all([
+      this.repository.listResources(input.organizationId),
+      this.repository.listReservationServices(input.organizationId),
+    ]);
+    return {
+      resources: resources.filter((resource) => resource.active).map(serializeResource),
+      services: services.filter((service) => service.active).map(serializeService),
+    };
+  }
 }
 
 export class DrizzleReservationApiRepository implements ReservationApiRepository {
@@ -126,6 +145,26 @@ export class DrizzleReservationApiRepository implements ReservationApiRepository
       )
       .limit(1);
     return rows[0] ?? null;
+  }
+
+  async listResources(organizationId: string): Promise<ReservableResource[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.resource)
+      .where(eq(schema.resource.organizationId, organizationId))
+      .orderBy(schema.resource.sortOrder, schema.resource.name);
+    return rows;
+  }
+
+  async listReservationServices(
+    organizationId: string
+  ): Promise<ReservationServiceDefinition[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.reservationService)
+      .where(eq(schema.reservationService.organizationId, organizationId))
+      .orderBy(schema.reservationService.sortOrder, schema.reservationService.name);
+    return rows;
   }
 
   async contactExists(organizationId: string, id: string): Promise<boolean> {
@@ -176,6 +215,28 @@ export function serializeReservation(reservation: Reservation) {
     startsAt: reservation.startsAt.toISOString(),
     endsAt: reservation.endsAt.toISOString(),
     status: reservation.status,
+  };
+}
+
+export function serializeResource(resource: ReservableResource): ReservationResourceDto {
+  return {
+    id: resource.id,
+    name: resource.name,
+    description: resource.description,
+    kind: resource.kind,
+    location: resource.location,
+    capacity: resource.capacity,
+  };
+}
+
+export function serializeService(
+  service: ReservationServiceDefinition
+): ReservationServiceDto {
+  return {
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    durationMinutes: service.durationMinutes,
   };
 }
 

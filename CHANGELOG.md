@@ -10,7 +10,8 @@ committed changelog entries, release evidence, and merged pull requests.
 
 ### Added
 
-- Nothing yet.
+- Inbox operators can create reservation holds from selected conversations using
+  active resources and services.
 
 ### Changed
 
