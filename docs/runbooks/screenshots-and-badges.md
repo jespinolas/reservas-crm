@@ -22,6 +22,9 @@ Current README screenshots:
 | `docs/screenshots/reservas-reservations.png` | Reservations view. |
 | `docs/screenshots/reservas-settings-about.png` | About/settings with project identity and upstream credit. |
 
+Current screenshot evidence is tracked in
+[`docs/screenshots/README.md`](../screenshots/README.md).
+
 ## Refresh Triggers
 
 Refresh screenshots when:
@@ -53,6 +56,10 @@ Allowed badges after resources exist:
 - Latest GitHub release.
 - License.
 - GHCR package when images are published.
+- Security policy when `SECURITY.md` exists and GitHub security-policy routing
+  points users away from public vulnerability reports.
+- Project status when linked to a public roadmap that accurately states current
+  project maturity.
 
 Do not add:
 
@@ -69,7 +76,22 @@ When eligible, use public links for:
 - `https://github.com/jespinolas/reservas-crm/actions/workflows/ci.yml`
 - `https://github.com/jespinolas/reservas-crm/releases`
 - `https://github.com/jespinolas/reservas-crm/blob/main/LICENSE`
+- `https://github.com/jespinolas/reservas-crm/security/policy`
+- `https://github.com/jespinolas/reservas-crm/blob/main/ROADMAP.md`
 - `https://github.com/jespinolas/reservas-crm/pkgs/container/reservas-crm`
+
+## Current README Badge Review
+
+Reviewed on 2026-07-23:
+
+| Badge | README target | Eligibility evidence |
+| --- | --- | --- |
+| CI | `actions/workflows/ci.yml` | `.github/workflows/ci.yml` exists and GitHub reports the workflow as active. |
+| Release | `releases` | GitHub releases exist; `v1.0.0` is the current stable release baseline. |
+| GHCR | `pkgs/container/reservas-crm` | Package page returns HTTP 200 publicly; GHCR image publishing workflow exists. |
+| License | `LICENSE` | MIT license file exists in the repository. |
+| Security Policy | `SECURITY.md` | Public security policy exists and GitHub issue templates route vulnerability reports away from public issues. |
+| Status | `ROADMAP.md` | Public roadmap exists and the badge text matches current alpha-ready project posture. |
 
 ## Evidence
 

@@ -47,6 +47,7 @@ Examples:
 | Fresh install smoke | `docs/runbooks/fresh-install-smoke-test.md` |  |  |
 | Deployment docs review | `docs/deployment/docker-compose.md`, `docs/deployment/coolify.md`, `docs/deployment/environment.md`, `docs/deployment/upgrades.md` |  |  |
 | Security docs review | `SECURITY.md` |  |  |
+| Screenshot and badge review | `docs/runbooks/screenshots-and-badges.md`, `docs/screenshots/README.md`, `README.md` |  |  |
 | Secret scan | Repository hygiene checklist |  |  |
 
 ## Screenshots
