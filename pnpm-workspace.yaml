@@ -1,3 +1,8 @@
+overrides:
+  esbuild: 0.28.1
+  postcss: 8.5.22
+  sharp: 0.35.3
+
 allowBuilds:
   esbuild: true
   sharp: true

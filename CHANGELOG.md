@@ -22,7 +22,8 @@ committed changelog entries, release evidence, and merged pull requests.
 
 ### Security
 
-- Nothing yet.
+- Updated dependency security posture by resolving vulnerable PostCSS, Sharp,
+  and esbuild dependency paths through direct updates and pnpm overrides.
 
 ## [1.1.0-alpha.2] - 2026-07-23
 
