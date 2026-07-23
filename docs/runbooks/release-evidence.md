@@ -46,6 +46,7 @@ Examples:
 | Docker build | `docker build -t reservas-crm:<version> .` |  |  |
 | Fresh install smoke | `docs/runbooks/fresh-install-smoke-test.md` |  |  |
 | Deployment docs review | `docs/deployment/docker-compose.md`, `docs/deployment/coolify.md`, `docs/deployment/environment.md`, `docs/deployment/upgrades.md` |  |  |
+| Security docs review | `SECURITY.md` |  |  |
 | Secret scan | Repository hygiene checklist |  |  |
 
 ## Screenshots
