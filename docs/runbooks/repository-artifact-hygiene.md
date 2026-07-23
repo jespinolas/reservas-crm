@@ -26,6 +26,10 @@ database dumps, or production identifiers.
 
 If a file is unclear, treat it as private until reviewed.
 
+Security reports, vulnerability reproductions, exploit notes, leaked-secret
+triage, customer logs, and private reporter contact details are private scope
+unless the maintainer explicitly prepares a public-safe advisory.
+
 ## Required Checks
 
 1. Inspect tracked, untracked, and ignored files:
