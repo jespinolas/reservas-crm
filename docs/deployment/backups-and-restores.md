@@ -18,6 +18,11 @@ Protect the backup file:
 - Encrypt it when practical.
 - Restrict access to trusted operators.
 - Keep backup namespaces separate per installation.
+- Retain the application version, database version, and backup timestamp with
+  the private operational record.
+
+Do not publish backup filenames if they include customer names, private domains,
+or infrastructure identifiers.
 
 ## Restore
 
@@ -41,6 +46,11 @@ docker compose logs -f app
 curl -f https://crm.example.com/api/health
 ```
 
+If restoring as part of a rollback, also restore the matching application
+version or container image described in the release notes. Do not run a newer
+app against an older restored database unless the release notes explicitly say
+that path is supported.
+
 ## Restore Drill
 
 Before a production release, verify that a recent backup can be restored in a
@@ -54,3 +64,13 @@ non-production environment. Record:
 - Known limitations.
 
 Do not record private customer data or secrets in restore evidence.
+
+## Coolify Notes
+
+Use Coolify's PostgreSQL backup and restore controls when available. The same
+rules apply:
+
+- Backups contain customer data and must be protected.
+- Restore drills should happen outside production.
+- The restored database must match the intended app version.
+- `/api/health` is required after restore.
