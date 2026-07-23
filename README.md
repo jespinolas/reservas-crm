@@ -99,7 +99,9 @@ Detailed setup and operations:
 - [Fresh install smoke test](docs/runbooks/fresh-install-smoke-test.md)
 - [Docker Compose deployment](docs/deployment/docker-compose.md)
 - [Coolify deployment](docs/deployment/coolify.md)
+- [Environment reference](docs/deployment/environment.md)
 - [Backups and restores](docs/deployment/backups-and-restores.md)
+- [Upgrades and rollbacks](docs/deployment/upgrades.md)
 
 Local development:
 

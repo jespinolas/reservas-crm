@@ -6,6 +6,10 @@ repository.
 Do not store production secrets in Git. Configure secrets in Coolify runtime
 environment variables.
 
+Use one Coolify application and one PostgreSQL database per business
+installation. Do not share databases, secrets, persistent volumes, domains, or
+backup namespaces across businesses.
+
 ## 1. Create The Application
 
 In Coolify:
@@ -17,6 +21,10 @@ In Coolify:
 5. Add a PostgreSQL database resource or attach an existing dedicated database.
 
 Use one database per business installation.
+
+If Coolify deploys from a Dockerfile, the app image runs migrations on startup.
+If Coolify deploys from a published image, pin a release tag or digest instead
+of an unreviewed moving tag for production.
 
 ## 2. Environment Variables
 
@@ -33,6 +41,9 @@ Set the variables from `.env.example` in Coolify:
 
 Generate unique values per installation. Do not reuse secrets across customer
 installations.
+
+See [`docs/deployment/environment.md`](environment.md) for required variables,
+optional variables, generation commands, and public-safe examples.
 
 ## 3. Migrations
 
@@ -55,6 +66,9 @@ https://crm.example.com/api/webhooks/wa/<META_WEBHOOK_VERIFY_TOKEN>
 
 Use the same verify token configured in Coolify.
 
+Treat the full webhook URL as sensitive. In direct Meta mode, configure
+`META_APP_SECRET` so webhook signatures are validated.
+
 ## 5. Health Check
 
 Verify:
@@ -74,8 +88,23 @@ Before deploying a new version:
 5. Deploy the new commit or image.
 6. Check logs and `/api/health`.
 
+See [`docs/deployment/upgrades.md`](upgrades.md) for the complete upgrade,
+rollback, and evidence checklist.
+
 ## 7. Rollback
 
 Use Coolify rollback to return to the previous deployment. If the release
 included migrations or data changes, follow release-specific restore guidance
 and restore PostgreSQL from backup when required.
+
+## 8. Production Readiness Checklist
+
+- Dedicated PostgreSQL database for the installation.
+- HTTPS enabled on the public domain.
+- Required environment variables configured in Coolify, not committed to Git.
+- App logs show migration evidence.
+- `/api/health` succeeds.
+- Backup schedule configured.
+- Restore drill tested outside production.
+- Webhook URL and tokens kept out of public screenshots, issues, and release
+  evidence.
