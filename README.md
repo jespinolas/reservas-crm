@@ -100,6 +100,7 @@ Detailed setup and operations:
 - [Docker Compose deployment](docs/deployment/docker-compose.md)
 - [Coolify deployment](docs/deployment/coolify.md)
 - [Environment reference](docs/deployment/environment.md)
+- [Security policy](SECURITY.md)
 - [Backups and restores](docs/deployment/backups-and-restores.md)
 - [Upgrades and rollbacks](docs/deployment/upgrades.md)
 
