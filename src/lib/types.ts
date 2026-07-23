@@ -68,3 +68,19 @@ export type ReservationListSummaryDto = {
   cancelled: number;
   activeHolds: number;
 };
+
+export type ReservationResourceDto = {
+  id: string;
+  name: string;
+  description: string | null;
+  kind: "football_field" | "room" | "venue" | "cabin" | "other";
+  location: string | null;
+  capacity: number;
+};
+
+export type ReservationServiceDto = {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+};

@@ -129,6 +129,33 @@ describe("ReservationApiService", () => {
     expect(serializeReservation(reservation)).not.toHaveProperty("organizationId");
   });
 
+  it("lists only active catalog entries without organization identifiers", async () => {
+    const { service } = fixture();
+
+    const catalog = await service.listActiveCatalog({ organizationId: "org_1" });
+
+    expect(catalog).toEqual({
+      resources: [
+        {
+          id: "res_1",
+          name: "Cancha 1",
+          description: null,
+          kind: "football_field",
+          location: null,
+          capacity: 10,
+        },
+      ],
+      services: [
+        {
+          id: "rsvc_1",
+          name: "Turno 60",
+          description: null,
+          durationMinutes: 60,
+        },
+      ],
+    });
+  });
+
   it("maps deterministic API errors to HTTP responses", async () => {
     const response = reservationApiErrorResponse(new ReservationApiError("resource_not_found"));
     const body = await response.json();
@@ -188,6 +215,22 @@ class FakeReservationApiRepository implements ReservationApiRepository {
         updatedAt: now,
       },
     ],
+    [
+      "res_inactive",
+      {
+        id: "res_inactive",
+        organizationId: "org_1",
+        name: "Cancha inactiva",
+        description: null,
+        kind: "football_field",
+        location: null,
+        capacity: 10,
+        active: false,
+        sortOrder: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
   ]);
   readonly services = new Map<string, ReservationServiceDefinition>([
     [
@@ -200,6 +243,20 @@ class FakeReservationApiRepository implements ReservationApiRepository {
         durationMinutes: 60,
         active: true,
         sortOrder: 0,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    [
+      "rsvc_inactive",
+      {
+        id: "rsvc_inactive",
+        organizationId: "org_1",
+        name: "Turno inactivo",
+        description: null,
+        durationMinutes: 60,
+        active: false,
+        sortOrder: 1,
         createdAt: now,
         updatedAt: now,
       },
@@ -225,6 +282,20 @@ class FakeReservationApiRepository implements ReservationApiRepository {
   ): Promise<ReservationServiceDefinition | null> {
     const service = this.services.get(id);
     return service?.organizationId === organizationId ? service : null;
+  }
+
+  async listResources(organizationId: string): Promise<ReservableResource[]> {
+    return [...this.resources.values()].filter(
+      (resource) => resource.organizationId === organizationId
+    );
+  }
+
+  async listReservationServices(
+    organizationId: string
+  ): Promise<ReservationServiceDefinition[]> {
+    return [...this.services.values()].filter(
+      (service) => service.organizationId === organizationId
+    );
   }
 
   async contactExists(_organizationId: string, id: string): Promise<boolean> {
