@@ -24,6 +24,43 @@ committed changelog entries, release evidence, and merged pull requests.
 
 - Nothing yet.
 
+## [1.1.0-alpha.2] - 2026-07-23
+
+### Added
+
+- Reproducible fresh-install smoke test script covering clean clone setup,
+  placeholder environment generation, Docker Compose boot, migrations, and the
+  `/api/health` endpoint.
+- Public deployment documentation for Docker Compose, Coolify, environment
+  variables, HTTPS/webhooks, backups, restores, and upgrades.
+- Public screenshot maintenance guidance and release evidence template for
+  future branded release artifacts.
+
+### Changed
+
+- Release evidence process now requires verification results, screenshots when
+  applicable, upgrade notes, known limitations, security notes, approval state,
+  and exception handling for every release or prerelease.
+- Public security documentation now gives clearer guidance for secret handling,
+  WhatsApp webhook posture, token encryption, dependency security, and
+  vulnerability reporting.
+- Automated bot PR assignment now skips bot-authored pull requests, and
+  Dependabot update noise is reduced through weekly grouped updates.
+- Dependency maintenance updates for Next.js, Drizzle ORM, Vitest, direct
+  PostCSS, and nested PostCSS versions.
+
+### Fixed
+
+- `v1.1.0-alpha.1` release evidence was reconciled with the published GHCR
+  prerelease image digest and workflow run.
+
+### Security
+
+- Dependency maintenance includes a Next.js patch update and supporting
+  dependency refreshes.
+- Security and deployment examples remain public-safe and continue to require
+  installation-specific secrets outside the repository.
+
 ## [1.1.0-alpha.1] - 2026-07-22
 
 ### Added
@@ -61,6 +98,7 @@ committed changelog entries, release evidence, and merged pull requests.
 - Public security policy and secret-handling expectations for self-hosted
   deployments.
 
-[Unreleased]: https://github.com/jespinolas/reservas-crm/compare/v1.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/jespinolas/reservas-crm/compare/v1.1.0-alpha.2...HEAD
+[1.1.0-alpha.2]: https://github.com/jespinolas/reservas-crm/compare/v1.1.0-alpha.1...v1.1.0-alpha.2
 [1.1.0-alpha.1]: https://github.com/jespinolas/reservas-crm/compare/v1.0.0...v1.1.0-alpha.1
 [1.0.0]: https://github.com/jespinolas/reservas-crm/releases/tag/v1.0.0
