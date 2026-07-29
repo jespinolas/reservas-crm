@@ -31,10 +31,20 @@ describe("MetaApiError.isAuthError", () => {
     );
   });
 
-  it("OAuthException es error de auth", () => {
+  it("OAuthException sin código de token no es necesariamente auth", () => {
     expect(
       new MetaApiError("x", { status: 400, type: "OAuthException" }).isAuthError
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("code 133010 no marca el token como vencido", () => {
+    expect(
+      new MetaApiError("Account not registered", {
+        status: 400,
+        code: 133010,
+        type: "OAuthException",
+      }).isAuthError
+    ).toBe(false);
   });
 
   it("un 500 cualquiera NO es error de auth", () => {

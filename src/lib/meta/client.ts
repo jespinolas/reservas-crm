@@ -26,9 +26,7 @@ export class MetaApiError extends Error {
 
   /** Token vencido/revocado → la conexión requiere re-autenticación. */
   get isAuthError(): boolean {
-    return (
-      this.status === 401 || this.code === 190 || this.type === "OAuthException"
-    );
+    return this.status === 401 || this.code === 190;
   }
 }
 

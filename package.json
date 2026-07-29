@@ -34,7 +34,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:fresh-install": "bash scripts/fresh-install-smoke.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "seed:demo": "esbuild scripts/seed/demo.ts --bundle --platform=node --format=esm --outfile=.tmp-seed-demo.mjs --alias:@=./src --packages=external && node .tmp-seed-demo.mjs"
@@ -45,10 +44,10 @@
     "better-auth": "^1.1.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.38.3",
     "lucide-react": "^0.469.0",
     "nanoid": "^5.0.9",
-    "next": "^15.5.21",
+    "next": "^15.1.3",
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -61,15 +60,15 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
-    "drizzle-kit": "^0.31.10",
-    "esbuild": "^0.28.1",
+    "drizzle-kit": "^0.30.1",
+    "esbuild": "^0.24.2",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.1.3",
     "playwright": "^1.61.1",
-    "postcss": "^8.5.22",
+    "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.7.2",
-    "vitest": "^3.2.6"
+    "vitest": "^2.1.8"
   }
 }

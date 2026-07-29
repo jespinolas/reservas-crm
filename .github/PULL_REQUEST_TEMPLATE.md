@@ -15,4 +15,3 @@
 - [ ] Upstream MIT attribution remains preserved when touched.
 
 ## Notes
-

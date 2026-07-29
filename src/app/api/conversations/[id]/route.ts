@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { apiError, parseBody, withAuth } from "@/lib/api";
 import { publish } from "@/server/events/bus";
-import { serializeConversation, getConversation, updateConversation } from "@/server/inbox/queries";
+import {
+  serializeConversation,
+  getConversation,
+  updateConversation,
+} from "@/server/inbox/queries";
+import { getLatestAiReplyAttempt } from "@/server/ai/reply-attempts";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +28,13 @@ export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {
 
   const row = await getConversation(session.organizationId, id);
   if (row) {
-    const dto = serializeConversation(row.conversation, row.contact);
+    const dto = serializeConversation(
+      row.conversation,
+      row.contact,
+      null,
+      null,
+      await getLatestAiReplyAttempt(id)
+    );
     publish(session.organizationId, {
       type: "conversation.updated",
       data: { conversation: dto },

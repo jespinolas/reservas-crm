@@ -2,6 +2,11 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { isWindowOpen, windowRemainingMs } from "@/server/inbox/window";
+import {
+  getLatestAiReplyAttempt,
+  toAgentState,
+  type AiReplyAttempt,
+} from "@/server/ai/reply-attempts";
 
 export type ConversationDto = {
   id: string;
@@ -16,6 +21,37 @@ export type ConversationDto = {
   windowOpen: boolean;
   windowRemainingMs: number;
   preview: string | null;
+  agentState: {
+    enabled: boolean;
+    attemptId: string | null;
+    state:
+      | "disabled"
+      | "not_ready"
+      | "eligible"
+      | "generating"
+      | "sent"
+      | "blocked"
+      | "failed"
+      | "handoff";
+    blockedReason:
+      | "crm_unhealthy"
+      | "db_unavailable"
+      | "provider_not_configured"
+      | "provider_failed"
+      | "conversation_ai_disabled"
+      | "business_ai_disabled"
+      | "human_handoff"
+      | "outside_window"
+      | "duplicate_inbound"
+      | "send_failed"
+      | "invalid_model_output"
+      | null;
+    provider: string | null;
+    model: string | null;
+    latencyMs: number | null;
+    redactedError: string | null;
+    lastAttemptAt: string | null;
+  };
 };
 
 export async function listConversations(
@@ -59,8 +95,16 @@ export async function listConversations(
     )
     .orderBy(desc(sql`coalesce(${schema.conversation.lastMessageAt}, ${schema.conversation.createdAt})`));
 
-  return rows.map((r) =>
-    serializeConversation(r.conversation, r.contact, r.preview, r.stageName)
+  return Promise.all(
+    rows.map(async (r) =>
+      serializeConversation(
+        r.conversation,
+        r.contact,
+        r.preview,
+        r.stageName,
+        await getLatestAiReplyAttempt(r.conversation.id)
+      )
+    )
   );
 }
 
@@ -111,7 +155,8 @@ export function serializeConversation(
   c: typeof schema.conversation.$inferSelect,
   contact: typeof schema.contact.$inferSelect,
   preview: string | null = null,
-  stageName: string | null = null
+  stageName: string | null = null,
+  latestAttempt: AiReplyAttempt | null = null
 ): ConversationDto {
   return {
     id: c.id,
@@ -126,6 +171,7 @@ export function serializeConversation(
     windowOpen: isWindowOpen(c.lastInboundAt),
     windowRemainingMs: windowRemainingMs(c.lastInboundAt),
     preview,
+    agentState: toAgentState(c, latestAttempt),
   };
 }
 

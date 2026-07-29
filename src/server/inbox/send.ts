@@ -150,6 +150,12 @@ export async function callGraphSend(
       if (err.status === 0 || err.status >= 500) {
         throw new SendError("meta_unavailable", "Meta no está disponible ahora");
       }
+      if (err.code === 133010) {
+        throw new SendError(
+          "meta_error",
+          "Meta dice que este número todavía no está registrado para enviar por Cloud API/coexistencia. Revisa el estado del número en WhatsApp Manager."
+        );
+      }
       throw new SendError("meta_error", err.message);
     }
     throw err;

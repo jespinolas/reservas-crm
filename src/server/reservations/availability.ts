@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { and, asc, eq, gt, lt } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import type {
   BusinessConfiguration,
@@ -299,6 +301,117 @@ export class InMemoryAvailabilityRepository implements AvailabilityRepository {
   }
 }
 
+export class DrizzleAvailabilityRepository implements AvailabilityRepository {
+  constructor(private readonly db = getDb()) {}
+
+  async saveResourceSchedule(schedule: ResourceSchedule): Promise<void> {
+    await this.db
+      .insert(schema.resourceSchedule)
+      .values(schedule)
+      .onConflictDoUpdate({
+        target: schema.resourceSchedule.id,
+        set: {
+          dayOfWeek: schedule.dayOfWeek,
+          startMinute: schedule.startMinute,
+          endMinute: schedule.endMinute,
+          active: schedule.active,
+          updatedAt: schedule.updatedAt,
+        },
+      });
+  }
+
+  async listResourceSchedules(
+    organizationId: string,
+    resourceId: string
+  ): Promise<ResourceSchedule[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.resourceSchedule)
+      .where(
+        and(
+          eq(schema.resourceSchedule.organizationId, organizationId),
+          eq(schema.resourceSchedule.resourceId, resourceId)
+        )
+      )
+      .orderBy(asc(schema.resourceSchedule.dayOfWeek), asc(schema.resourceSchedule.startMinute));
+    return rows.map(cloneSchedule);
+  }
+
+  async saveScheduleException(exception: ScheduleException): Promise<void> {
+    await this.db
+      .insert(schema.scheduleException)
+      .values(exception)
+      .onConflictDoUpdate({
+        target: schema.scheduleException.id,
+        set: {
+          localDate: exception.localDate,
+          startMinute: exception.startMinute,
+          endMinute: exception.endMinute,
+          kind: exception.kind,
+          reason: exception.reason,
+          updatedAt: exception.updatedAt,
+        },
+      });
+  }
+
+  async listScheduleExceptions(input: {
+    organizationId: string;
+    resourceId: string;
+    localDateFrom: string;
+    localDateTo: string;
+  }): Promise<ScheduleException[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.scheduleException)
+      .where(
+        and(
+          eq(schema.scheduleException.organizationId, input.organizationId),
+          eq(schema.scheduleException.resourceId, input.resourceId),
+          gt(schema.scheduleException.localDate, previousLocalDate(input.localDateFrom)),
+          lt(schema.scheduleException.localDate, nextLocalDate(input.localDateTo))
+        )
+      )
+      .orderBy(asc(schema.scheduleException.localDate), asc(schema.scheduleException.startMinute));
+    return rows.map(cloneException);
+  }
+
+  async saveBlackoutPeriod(period: BlackoutPeriod): Promise<void> {
+    await this.db
+      .insert(schema.blackoutPeriod)
+      .values(period)
+      .onConflictDoUpdate({
+        target: schema.blackoutPeriod.id,
+        set: {
+          startsAt: period.startsAt,
+          endsAt: period.endsAt,
+          reason: period.reason,
+          updatedAt: period.updatedAt,
+        },
+      });
+  }
+
+  async listBlackoutPeriods(input: {
+    organizationId: string;
+    resourceId: string;
+    startsBefore: Date;
+    endsAfter: Date;
+  }): Promise<BlackoutPeriod[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.blackoutPeriod)
+      .where(
+        and(
+          eq(schema.blackoutPeriod.organizationId, input.organizationId),
+          eq(schema.blackoutPeriod.resourceId, input.resourceId),
+          lt(schema.blackoutPeriod.startsAt, input.startsBefore),
+          gt(schema.blackoutPeriod.endsAt, input.endsAfter)
+        )
+      )
+      .orderBy(asc(schema.blackoutPeriod.startsAt));
+    return rows.map(cloneBlackout);
+  }
+}
+
 const scheduleBaseInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
@@ -454,6 +567,16 @@ function parseLocalDate(localDate: string): Date {
 
 function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function previousLocalDate(localDate: string): string {
+  const date = parseLocalDate(localDate);
+  return formatDate(new Date(date.getTime() - 24 * 60 * 60 * 1000));
+}
+
+function nextLocalDate(localDate: string): string {
+  const date = parseLocalDate(localDate);
+  return formatDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
 }
 
 function cloneSchedule(schedule: ResourceSchedule): ResourceSchedule {

@@ -7,6 +7,7 @@ import type { WebhookValue } from "@/server/inbox/webhook";
 import { applyStatusUpdate } from "@/server/inbox/status";
 import { onLeadActivity } from "@/server/inbox/lead-activity";
 import { maybeRunAgentTurn } from "@/server/ai/trigger";
+import { createManualPaymentVerificationService } from "@/server/payments/manual-verifications";
 
 /** Tipos de contenido soportados; el resto se ignora sin error. */
 const SUPPORTED_TYPES = new Set([
@@ -128,7 +129,8 @@ export async function processMessagesValue(value: WebhookValue): Promise<void> {
       profileName: profileName ?? null,
       waMessageId: msg.id,
       type: msg.type,
-      text: msg.text?.body ?? null,
+      text: msg.text?.body ?? msg.image?.caption ?? msg.document?.caption ?? null,
+      evidenceMediaId: msg.image?.id ?? msg.document?.id ?? null,
       timestamp: msg.timestamp,
     });
   }
@@ -141,6 +143,7 @@ export async function ingestInboundMessage(input: {
   waMessageId: string;
   type: string;
   text: string | null;
+  evidenceMediaId?: string | null;
   timestamp: string;
 }): Promise<void> {
   const db = getDb();
@@ -176,6 +179,20 @@ export async function ingestInboundMessage(input: {
     .returning();
   const message = inserted[0];
   if (!message) return; // duplicado
+
+  try {
+    await createManualPaymentVerificationService().recordInboundEvidence({
+      organizationId,
+      conversationId: conversation.id,
+      contactId: contact.id,
+      messageId: message.id,
+      messageType: input.type,
+      text: input.text,
+      evidenceMediaId: input.evidenceMediaId ?? null,
+    });
+  } catch (error) {
+    console.warn("[payments] no se pudo registrar evidencia manual:", error);
+  }
 
   await db
     .update(schema.conversation)

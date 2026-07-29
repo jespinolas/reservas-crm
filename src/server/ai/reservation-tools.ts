@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { and, desc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
 import {
   BookingError,
   type BookingHold,
@@ -48,6 +50,12 @@ export const reservationToolInputSchema = z.discriminatedUnion("tool", [
       holdId: z.string().trim().min(1),
     })
     .strict(),
+  baseToolSchema
+    .extend({
+      tool: z.literal("payment.manual_verification_status"),
+      holdId: z.string().trim().min(1).optional(),
+    })
+    .strict(),
 ]);
 
 export type ReservationToolInput = z.infer<typeof reservationToolInputSchema>;
@@ -55,7 +63,25 @@ export type ReservationToolInput = z.infer<typeof reservationToolInputSchema>;
 export type ReservationToolContext = {
   organizationId: string;
   contactId: string | null;
+  conversationId?: string | null;
   now?: Date;
+};
+
+export type ManualPaymentToolStatus =
+  | "not_requested"
+  | "waiting_for_evidence"
+  | "needs_operator_review"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "cancelled";
+
+export type ManualPaymentToolStatusResult = {
+  status: ManualPaymentToolStatus;
+  holdId: string | null;
+  expectedAmountMinor: number | null;
+  currency: string | null;
+  expiresAt: string | null;
 };
 
 export type ReservationToolResult =
@@ -73,6 +99,11 @@ export type ReservationToolResult =
       ok: true;
       tool: "reservation.confirm_hold";
       reservation: ReturnType<typeof serializeReservation>;
+    }
+  | {
+      ok: true;
+      tool: "payment.manual_verification_status";
+      payment: ManualPaymentToolStatusResult;
     }
   | {
       ok: false;
@@ -99,10 +130,20 @@ export interface ReservationToolAvailabilityReader {
   }): Promise<AvailabilitySlot[]>;
 }
 
+export interface ManualPaymentStatusReader {
+  getManualVerificationStatus(input: {
+    organizationId: string;
+    contactId: string | null;
+    conversationId?: string | null;
+    holdId?: string;
+  }): Promise<ManualPaymentToolStatusResult>;
+}
+
 export class ReservationToolExecutor {
   constructor(
     private readonly apiService: Pick<ReservationApiService, "createHold" | "confirmHold">,
-    private readonly availabilityReader: ReservationToolAvailabilityReader
+    private readonly availabilityReader: ReservationToolAvailabilityReader,
+    private readonly paymentStatusReader: ManualPaymentStatusReader = new EmptyManualPaymentStatusReader()
   ) {}
 
   async execute(
@@ -130,6 +171,8 @@ export class ReservationToolExecutor {
           return await this.createHold(parsed.data, context);
         case "reservation.confirm_hold":
           return await this.confirmHold(parsed.data, context);
+        case "payment.manual_verification_status":
+          return await this.getManualVerificationStatus(parsed.data, context);
       }
     } catch (error) {
       return reservationToolError(error);
@@ -188,6 +231,19 @@ export class ReservationToolExecutor {
       reservation: serializeReservation(reservation as Reservation),
     };
   }
+
+  private async getManualVerificationStatus(
+    input: Extract<ReservationToolInput, { tool: "payment.manual_verification_status" }>,
+    context: ReservationToolContext
+  ): Promise<ReservationToolResult> {
+    const payment = await this.paymentStatusReader.getManualVerificationStatus({
+      organizationId: context.organizationId,
+      contactId: context.contactId,
+      conversationId: context.conversationId ?? null,
+      holdId: input.holdId,
+    });
+    return { ok: true, tool: input.tool, payment };
+  }
 }
 
 function validateRange(input: ReservationToolInput): ReservationToolResult | null {
@@ -211,7 +267,80 @@ function validateRange(input: ReservationToolInput): ReservationToolResult | nul
 export function createReservationToolExecutor(
   availabilityReader: ReservationToolAvailabilityReader
 ): ReservationToolExecutor {
-  return new ReservationToolExecutor(createReservationApiService(), availabilityReader);
+  return new ReservationToolExecutor(
+    createReservationApiService(),
+    availabilityReader,
+    new DrizzleManualPaymentStatusReader()
+  );
+}
+
+class EmptyManualPaymentStatusReader implements ManualPaymentStatusReader {
+  async getManualVerificationStatus(): Promise<ManualPaymentToolStatusResult> {
+    return {
+      status: "not_requested",
+      holdId: null,
+      expectedAmountMinor: null,
+      currency: null,
+      expiresAt: null,
+    };
+  }
+}
+
+export class DrizzleManualPaymentStatusReader implements ManualPaymentStatusReader {
+  constructor(private readonly db = getDb()) {}
+
+  async getManualVerificationStatus(input: {
+    organizationId: string;
+    contactId: string | null;
+    conversationId?: string | null;
+    holdId?: string;
+  }): Promise<ManualPaymentToolStatusResult> {
+    const conditions = [
+      eq(schema.manualPaymentVerification.organizationId, input.organizationId),
+    ];
+    if (input.holdId) {
+      conditions.push(eq(schema.manualPaymentVerification.bookingHoldId, input.holdId));
+    } else if (input.conversationId) {
+      conditions.push(eq(schema.manualPaymentVerification.conversationId, input.conversationId));
+    } else if (input.contactId) {
+      conditions.push(eq(schema.manualPaymentVerification.contactId, input.contactId));
+    } else {
+      return {
+        status: "not_requested",
+        holdId: null,
+        expectedAmountMinor: null,
+        currency: null,
+        expiresAt: null,
+      };
+    }
+    if (input.contactId) {
+      conditions.push(eq(schema.manualPaymentVerification.contactId, input.contactId));
+    }
+
+    const rows = await this.db
+      .select()
+      .from(schema.manualPaymentVerification)
+      .where(and(...conditions))
+      .orderBy(desc(schema.manualPaymentVerification.createdAt))
+      .limit(1);
+    const verification = rows[0];
+    if (!verification) {
+      return {
+        status: "not_requested",
+        holdId: input.holdId ?? null,
+        expectedAmountMinor: null,
+        currency: null,
+        expiresAt: null,
+      };
+    }
+    return {
+      status: verification.status as ManualPaymentToolStatus,
+      holdId: verification.bookingHoldId,
+      expectedAmountMinor: verification.expectedAmountMinor,
+      currency: verification.currency,
+      expiresAt: verification.expiresAt.toISOString(),
+    };
+  }
 }
 
 function serializeSlot(slot: AvailabilitySlot) {
