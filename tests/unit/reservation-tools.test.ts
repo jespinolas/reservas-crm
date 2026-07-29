@@ -3,6 +3,7 @@ import {
   RESERVATION_TOOL_VERSION,
   ReservationToolExecutor,
   reservationToolInputSchema,
+  type ManualPaymentStatusReader,
   type ReservationToolAvailabilityReader,
 } from "@/server/ai/reservation-tools";
 import {
@@ -24,6 +25,19 @@ describe("reservation AI tool contracts", () => {
       startsAt: "2026-07-20T21:00:00.000Z",
       endsAt: "2026-07-20T22:00:00.000Z",
       idempotencyKey: "idem_1",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects model-supplied payment authority context", () => {
+    const parsed = reservationToolInputSchema.safeParse({
+      version: RESERVATION_TOOL_VERSION,
+      tool: "payment.manual_verification_status",
+      organizationId: "org_attacker",
+      contactId: "ct_attacker",
+      conversationId: "cv_attacker",
+      holdId: "hold_1",
     });
 
     expect(parsed.success).toBe(false);
@@ -153,15 +167,57 @@ describe("reservation AI tool contracts", () => {
       message: "Requested time is no longer available",
     });
   });
+
+  it("returns AI-safe manual payment status without evidence or operator details", async () => {
+    const { executor, paymentStatusReader } = fixture();
+    paymentStatusReader.result = {
+      status: "needs_operator_review",
+      holdId: "hold_1",
+      expectedAmountMinor: 150000,
+      currency: "PYG",
+      expiresAt: "2026-07-18T12:10:00.000Z",
+    };
+
+    const result = await executor.execute(
+      {
+        version: RESERVATION_TOOL_VERSION,
+        tool: "payment.manual_verification_status",
+        holdId: "hold_1",
+      },
+      { ...context(), conversationId: "cv_1" }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      tool: "payment.manual_verification_status",
+      payment: {
+        status: "needs_operator_review",
+        holdId: "hold_1",
+        expectedAmountMinor: 150000,
+        currency: "PYG",
+        expiresAt: "2026-07-18T12:10:00.000Z",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("evidence");
+    expect(JSON.stringify(result)).not.toContain("reviewedBy");
+    expect(paymentStatusReader.calls[0]).toMatchObject({
+      organizationId: "org_1",
+      contactId: "ct_1",
+      conversationId: "cv_1",
+      holdId: "hold_1",
+    });
+  });
 });
 
 function fixture() {
   const apiService = new FakeReservationApiService();
   const availabilityReader = new FakeAvailabilityReader();
+  const paymentStatusReader = new FakePaymentStatusReader();
   return {
     apiService,
     availabilityReader,
-    executor: new ReservationToolExecutor(apiService, availabilityReader),
+    paymentStatusReader,
+    executor: new ReservationToolExecutor(apiService, availabilityReader, paymentStatusReader),
   };
 }
 
@@ -222,5 +278,23 @@ class FakeAvailabilityReader implements ReservationToolAvailabilityReader {
   async listSlots(input: Parameters<ReservationToolAvailabilityReader["listSlots"]>[0]) {
     this.calls.push(input);
     return this.slots;
+  }
+}
+
+class FakePaymentStatusReader implements ManualPaymentStatusReader {
+  result: Awaited<ReturnType<ManualPaymentStatusReader["getManualVerificationStatus"]>> = {
+    status: "not_requested",
+    holdId: null,
+    expectedAmountMinor: null,
+    currency: null,
+    expiresAt: null,
+  };
+  calls: unknown[] = [];
+
+  async getManualVerificationStatus(
+    input: Parameters<ManualPaymentStatusReader["getManualVerificationStatus"]>[0]
+  ) {
+    this.calls.push(input);
+    return this.result;
   }
 }

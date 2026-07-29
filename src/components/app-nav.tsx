@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BarChart3,
   CalendarDays,
+  CalendarSync,
   FlaskConical,
   Inbox,
   Kanban,
@@ -22,9 +24,12 @@ const NAV = [
   { href: "/inbox", label: "Bandeja", icon: Inbox, badge: true },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/reservations", label: "Reservas", icon: CalendarDays },
+  { href: "/calendar", label: "Calendar", icon: CalendarSync },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/contacts", label: "Contactos", icon: Users },
   { href: "/agent", label: "Agente", icon: Sparkles },
   { href: "/lab", label: "Laboratorio", icon: FlaskConical },
+  { href: "/setup", label: "Setup", icon: Settings },
 ] as const;
 
 export function AppNav({

@@ -1,4 +1,6 @@
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 
 export const resourceKindSchema = z.enum([
@@ -6,6 +8,16 @@ export const resourceKindSchema = z.enum([
   "room",
   "venue",
   "cabin",
+  "house",
+  "court",
+  "field",
+  "chair",
+  "staff_member",
+  "therapist",
+  "stylist",
+  "vehicle",
+  "table",
+  "professional",
   "other",
 ]);
 
@@ -46,6 +58,16 @@ export type ReservationServiceDefinition = {
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type CatalogReadiness = {
+  ready: boolean;
+  activeResourceCount: number;
+  activeServiceCount: number;
+  inactiveResourceCount: number;
+  inactiveServiceCount: number;
+  missing: Array<"resources" | "services">;
+  warnings: string[];
 };
 
 export interface ReservationCatalogRepository {
@@ -227,6 +249,19 @@ export class ReservationCatalogService {
     return cloneResource(disabled);
   }
 
+  async enableResource(input: {
+    organizationId: string;
+    id: string;
+    now?: Date;
+  }): Promise<ReservableResource> {
+    const organizationId = organizationIdSchema.parse(input.organizationId);
+    const resource = await this.requireResource(organizationId, input.id);
+    await this.assertUniqueResourceName(organizationId, resource.name, resource.id);
+    const enabled = { ...resource, active: true, updatedAt: input.now ?? new Date() };
+    await this.repository.saveResource(enabled);
+    return cloneResource(enabled);
+  }
+
   async listResources(organizationId: string): Promise<ReservableResource[]> {
     return this.repository.listResources(organizationIdSchema.parse(organizationId));
   }
@@ -258,6 +293,34 @@ export class ReservationCatalogService {
     return cloneService(service);
   }
 
+  async updateReservationService(input: {
+    organizationId: string;
+    id: string;
+    name?: string;
+    description?: string | null;
+    durationMinutes?: number;
+    sortOrder?: number;
+    now?: Date;
+  }): Promise<ReservationServiceDefinition> {
+    const organizationId = organizationIdSchema.parse(input.organizationId);
+    const current = await this.requireReservationService(organizationId, input.id);
+    const parsed = serviceInputSchema.partial().parse(input);
+    const nextName = parsed.name ?? current.name;
+    if (current.active && nextName !== current.name) {
+      await this.assertUniqueReservationServiceName(organizationId, nextName, current.id);
+    }
+    const updated: ReservationServiceDefinition = {
+      ...current,
+      name: nextName,
+      description: parsed.description === undefined ? current.description : parsed.description,
+      durationMinutes: parsed.durationMinutes ?? current.durationMinutes,
+      sortOrder: parsed.sortOrder ?? current.sortOrder,
+      updatedAt: input.now ?? new Date(),
+    };
+    await this.repository.saveReservationService(updated);
+    return cloneService(updated);
+  }
+
   async disableReservationService(input: {
     organizationId: string;
     id: string;
@@ -269,10 +332,32 @@ export class ReservationCatalogService {
     return cloneService(disabled);
   }
 
+  async enableReservationService(input: {
+    organizationId: string;
+    id: string;
+    now?: Date;
+  }): Promise<ReservationServiceDefinition> {
+    const organizationId = organizationIdSchema.parse(input.organizationId);
+    const service = await this.requireReservationService(organizationId, input.id);
+    await this.assertUniqueReservationServiceName(organizationId, service.name, service.id);
+    const enabled = { ...service, active: true, updatedAt: input.now ?? new Date() };
+    await this.repository.saveReservationService(enabled);
+    return cloneService(enabled);
+  }
+
   async listReservationServices(
     organizationId: string
   ): Promise<ReservationServiceDefinition[]> {
     return this.repository.listReservationServices(organizationIdSchema.parse(organizationId));
+  }
+
+  async getCatalogReadiness(organizationId: string): Promise<CatalogReadiness> {
+    const scopedOrganizationId = organizationIdSchema.parse(organizationId);
+    const [resources, services] = await Promise.all([
+      this.listResources(scopedOrganizationId),
+      this.listReservationServices(scopedOrganizationId),
+    ]);
+    return buildCatalogReadiness(resources, services);
   }
 
   private async requireResource(
@@ -310,13 +395,164 @@ export class ReservationCatalogService {
 
   private async assertUniqueReservationServiceName(
     organizationId: string,
-    name: string
+    name: string,
+    exceptId?: string
   ) {
     const existing = await this.repository.findActiveReservationServiceByName(
       organizationId,
       name
     );
-    if (existing) throw new ReservationCatalogError("duplicate");
+    if (existing && existing.id !== exceptId) throw new ReservationCatalogError("duplicate");
+  }
+}
+
+export class DrizzleReservationCatalogRepository implements ReservationCatalogRepository {
+  constructor(private readonly db = getDb()) {}
+
+  async saveBusinessConfiguration(configuration: BusinessConfiguration): Promise<void> {
+    await this.db
+      .insert(schema.businessConfiguration)
+      .values(configuration)
+      .onConflictDoUpdate({
+        target: schema.businessConfiguration.organizationId,
+        set: {
+          timezone: configuration.timezone,
+          defaultSlotMinutes: configuration.defaultSlotMinutes,
+          defaultHoldMinutes: configuration.defaultHoldMinutes,
+          holdsBlockAvailability: configuration.holdsBlockAvailability,
+          updatedAt: configuration.updatedAt,
+        },
+      });
+  }
+
+  async findBusinessConfiguration(organizationId: string): Promise<BusinessConfiguration | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.businessConfiguration)
+      .where(eq(schema.businessConfiguration.organizationId, organizationId))
+      .limit(1);
+    return rows[0] ? normalizeConfigurationRow(rows[0]) : null;
+  }
+
+  async saveResource(resource: ReservableResource): Promise<void> {
+    await this.db
+      .insert(schema.resource)
+      .values(resource)
+      .onConflictDoUpdate({
+        target: schema.resource.id,
+        set: {
+          name: resource.name,
+          description: resource.description,
+          kind: resource.kind,
+          location: resource.location,
+          capacity: resource.capacity,
+          active: resource.active,
+          sortOrder: resource.sortOrder,
+          updatedAt: resource.updatedAt,
+        },
+      });
+  }
+
+  async findResourceById(
+    organizationId: string,
+    id: string
+  ): Promise<ReservableResource | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.resource)
+      .where(and(eq(schema.resource.organizationId, organizationId), eq(schema.resource.id, id)))
+      .limit(1);
+    return rows[0] ? normalizeResourceRow(rows[0]) : null;
+  }
+
+  async findActiveResourceByName(
+    organizationId: string,
+    name: string
+  ): Promise<ReservableResource | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.resource)
+      .where(
+        and(
+          eq(schema.resource.organizationId, organizationId),
+          eq(schema.resource.active, true),
+          eq(schema.resource.name, name)
+        )
+      )
+      .limit(1);
+    return rows[0] ? normalizeResourceRow(rows[0]) : null;
+  }
+
+  async listResources(organizationId: string): Promise<ReservableResource[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.resource)
+      .where(eq(schema.resource.organizationId, organizationId))
+      .orderBy(asc(schema.resource.sortOrder), asc(schema.resource.name));
+    return rows.map(normalizeResourceRow);
+  }
+
+  async saveReservationService(service: ReservationServiceDefinition): Promise<void> {
+    await this.db
+      .insert(schema.reservationService)
+      .values(service)
+      .onConflictDoUpdate({
+        target: schema.reservationService.id,
+        set: {
+          name: service.name,
+          description: service.description,
+          durationMinutes: service.durationMinutes,
+          active: service.active,
+          sortOrder: service.sortOrder,
+          updatedAt: service.updatedAt,
+        },
+      });
+  }
+
+  async findReservationServiceById(
+    organizationId: string,
+    id: string
+  ): Promise<ReservationServiceDefinition | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.reservationService)
+      .where(
+        and(
+          eq(schema.reservationService.organizationId, organizationId),
+          eq(schema.reservationService.id, id)
+        )
+      )
+      .limit(1);
+    return rows[0] ? normalizeServiceRow(rows[0]) : null;
+  }
+
+  async findActiveReservationServiceByName(
+    organizationId: string,
+    name: string
+  ): Promise<ReservationServiceDefinition | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.reservationService)
+      .where(
+        and(
+          eq(schema.reservationService.organizationId, organizationId),
+          eq(schema.reservationService.active, true),
+          eq(schema.reservationService.name, name)
+        )
+      )
+      .limit(1);
+    return rows[0] ? normalizeServiceRow(rows[0]) : null;
+  }
+
+  async listReservationServices(
+    organizationId: string
+  ): Promise<ReservationServiceDefinition[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.reservationService)
+      .where(eq(schema.reservationService.organizationId, organizationId))
+      .orderBy(asc(schema.reservationService.sortOrder), asc(schema.reservationService.name));
+    return rows.map(normalizeServiceRow);
   }
 }
 
@@ -429,4 +665,82 @@ function cloneService(service: ReservationServiceDefinition): ReservationService
     createdAt: new Date(service.createdAt),
     updatedAt: new Date(service.updatedAt),
   };
+}
+
+export function createReservationCatalogService(): ReservationCatalogService {
+  return new ReservationCatalogService(new DrizzleReservationCatalogRepository());
+}
+
+export function serializeResource(resource: ReservableResource) {
+  return {
+    id: resource.id,
+    name: resource.name,
+    description: resource.description,
+    kind: resource.kind,
+    location: resource.location,
+    capacity: resource.capacity,
+    active: resource.active,
+    sortOrder: resource.sortOrder,
+    createdAt: resource.createdAt.toISOString(),
+    updatedAt: resource.updatedAt.toISOString(),
+  };
+}
+
+export function serializeReservationService(service: ReservationServiceDefinition) {
+  return {
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    durationMinutes: service.durationMinutes,
+    active: service.active,
+    sortOrder: service.sortOrder,
+    createdAt: service.createdAt.toISOString(),
+    updatedAt: service.updatedAt.toISOString(),
+  };
+}
+
+export function buildCatalogReadiness(
+  resources: ReservableResource[],
+  services: ReservationServiceDefinition[]
+): CatalogReadiness {
+  const activeResources = resources.filter((resource) => resource.active);
+  const activeServices = services.filter((service) => service.active);
+  const missing: CatalogReadiness["missing"] = [];
+  const warnings: string[] = [];
+
+  if (activeResources.length === 0) missing.push("resources");
+  if (activeServices.length === 0) missing.push("services");
+  if (activeResources.some((resource) => !resource.description?.trim())) {
+    warnings.push("resource_descriptions_missing");
+  }
+  if (activeServices.some((service) => !service.description?.trim())) {
+    warnings.push("service_descriptions_missing");
+  }
+
+  return {
+    ready: missing.length === 0,
+    activeResourceCount: activeResources.length,
+    activeServiceCount: activeServices.length,
+    inactiveResourceCount: resources.length - activeResources.length,
+    inactiveServiceCount: services.length - activeServices.length,
+    missing,
+    warnings,
+  };
+}
+
+function normalizeConfigurationRow(row: typeof schema.businessConfiguration.$inferSelect): BusinessConfiguration {
+  return cloneConfiguration(row);
+}
+
+function normalizeResourceRow(row: typeof schema.resource.$inferSelect): ReservableResource {
+  return cloneResource({
+    ...row,
+    kind: resourceKindSchema.parse(row.kind),
+  });
+}
+
+function normalizeServiceRow(
+  row: typeof schema.reservationService.$inferSelect
+): ReservationServiceDefinition {
+  return cloneService(row);
 }

@@ -80,7 +80,13 @@ describe("sandbox del Laboratorio en el pipeline del agente", () => {
     graphRequest.mockReset();
     selectQueue.length = 0;
     inserts.length = 0;
+    vi.stubEnv("APP_BASE_URL", "http://localhost:3000");
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-auth-secret-value");
+    vi.stubEnv("ENCRYPTION_KEY", Buffer.alloc(32).toString("base64"));
+    vi.stubEnv("META_WEBHOOK_VERIFY_TOKEN", "test-verify-token");
     vi.stubEnv("OPENROUTER_API_TOKEN", "token-test");
+    vi.stubEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash");
   });
 
   it("turno sobre conversación is_test → persiste la respuesta y NO llama a Graph", async () => {
@@ -96,7 +102,6 @@ describe("sandbox del Laboratorio en el pipeline del agente", () => {
     };
     selectQueue.push(
       [testConversation], // conversación
-      [{ id: "agp_1", organizationId: "org_1", enabled: false, name: "Asistente", tone: null, instructions: null, escalationRules: null, greeting: null }], // perfil (apagado: el Lab evalúa igual)
       [
         {
           id: "msg_1",
@@ -105,6 +110,7 @@ describe("sandbox del Laboratorio en el pipeline del agente", () => {
           createdAt: new Date(),
         },
       ], // historial
+      [{ id: "agp_1", organizationId: "org_1", enabled: false, name: "Asistente", tone: null, instructions: null, escalationRules: null, greeting: null }], // perfil (apagado: el Lab evalúa igual)
       [], // kb
       [] // etapas
     );

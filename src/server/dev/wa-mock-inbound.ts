@@ -44,6 +44,19 @@ export function buildInboundPayload(input: {
     type,
   };
   if (type === "text") message.text = { body: input.text ?? "hola" };
+  if (type === "image") {
+    message.image = {
+      id: `media.mock.${nextN()}`,
+      caption: input.text ?? undefined,
+    };
+  }
+  if (type === "document") {
+    message.document = {
+      id: `media.mock.${nextN()}`,
+      caption: input.text ?? undefined,
+      filename: "comprobante.pdf",
+    };
+  }
 
   return {
     object: "whatsapp_business_account",

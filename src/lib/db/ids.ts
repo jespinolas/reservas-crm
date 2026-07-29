@@ -19,6 +19,7 @@ const prefixes = {
   businessConfiguration: "bcfg",
   resource: "res",
   reservationService: "rsvc",
+  reservationServicePaymentRule: "rpay",
   resourceSchedule: "rsch",
   scheduleException: "sex",
   blackoutPeriod: "blk",
@@ -26,9 +27,12 @@ const prefixes = {
   reservation: "rsv",
   reservationStatusHistory: "rsh",
   reservationReminder: "rem",
+  manualPaymentVerification: "mpv",
+  manualPaymentVerificationHistory: "mpvh",
   googleCalendarConnection: "gcal",
   googleCalendarSync: "gcalsync",
   automationOutbox: "aout",
+  aiReplyAttempt: "aira",
 } as const;
 
 export type IdKind = keyof typeof prefixes;

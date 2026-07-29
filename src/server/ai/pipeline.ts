@@ -1,7 +1,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
-import { getEnv, isAiConfigured } from "@/lib/env";
+import { getAiProviderReadiness, getEnv } from "@/lib/env";
 import { chatJson, type ChatMessage } from "@/lib/ai";
 import { publish } from "@/server/events/bus";
 import { isWindowOpen } from "@/server/inbox/window";
@@ -9,6 +9,12 @@ import { SendError, sendText } from "@/server/inbox/send";
 import { AgentAction, degradeAction, resolveStage, type AgentActionType } from "@/server/ai/actions";
 import { matchesHandoffIntent } from "@/server/ai/handoff";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
+import {
+  beginAiReplyAttempt,
+  markAiReplyAttempt,
+  type AiReplyAttempt,
+} from "@/server/ai/reply-attempts";
+import { listLiveKbEntries } from "@/server/kb/manager";
 
 /**
  * Turno del agente (FR-021..FR-025).
@@ -83,8 +89,6 @@ async function executeTurn(conversationId: string): Promise<void> {
  * debounce 0 y sin pasar por el coalesce).
  */
 export async function runAgentTurn(conversationId: string): Promise<void> {
-  if (!isAiConfigured()) return;
-
   const db = getDb();
   const convRows = await db
     .select()
@@ -94,20 +98,6 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
   const conversation = convRows[0];
   if (!conversation) return;
   const organizationId = conversation.organizationId;
-
-  // Condiciones de silencio: handoff activo o IA apagada en la conversación.
-  if (conversation.handoffAt || !conversation.aiEnabled) return;
-
-  const profileRows = await db
-    .select()
-    .from(schema.agentProfile)
-    .where(eq(schema.agentProfile.organizationId, organizationId))
-    .limit(1);
-  const profile = profileRows[0];
-  if (!profile) return;
-  // El toggle global aplica a conversaciones reales; el Laboratorio evalúa el
-  // comportamiento configurado aunque el agente aún no esté encendido.
-  if (!conversation.isTest && !profile.enabled) return;
 
   const history = await db
     .select()
@@ -119,23 +109,90 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
   const lastInbound = [...history].reverse().find((m) => m.direction === "in");
   if (!lastInbound) return;
 
+  const { attempt, duplicate } = await beginAiReplyAttempt({
+    organizationId,
+    conversationId,
+    inboundMessageId: lastInbound.id,
+  });
+  if (duplicate) return;
+
+  // Condiciones de silencio: handoff activo o IA apagada en la conversación.
+  if (conversation.handoffAt) {
+    await markAiReplyAttempt(attempt.id, {
+      state: "handoff",
+      blockedReason: "human_handoff",
+    });
+    publishAgentState(organizationId, conversationId);
+    return;
+  }
+  if (!conversation.aiEnabled) {
+    await markAiReplyAttempt(attempt.id, {
+      state: "disabled",
+      blockedReason: "conversation_ai_disabled",
+    });
+    publishAgentState(organizationId, conversationId);
+    return;
+  }
+
+  const profileRows = await db
+    .select()
+    .from(schema.agentProfile)
+    .where(eq(schema.agentProfile.organizationId, organizationId))
+    .limit(1);
+  const profile = profileRows[0];
+  if (!profile) {
+    await markAiReplyAttempt(attempt.id, {
+      state: "disabled",
+      blockedReason: "business_ai_disabled",
+    });
+    publishAgentState(organizationId, conversationId);
+    return;
+  }
+  // El toggle global aplica a conversaciones reales; el Laboratorio evalúa el
+  // comportamiento configurado aunque el agente aún no esté encendido.
+  if (!conversation.isTest && !profile.enabled) {
+    await markAiReplyAttempt(attempt.id, {
+      state: "disabled",
+      blockedReason: "business_ai_disabled",
+    });
+    publishAgentState(organizationId, conversationId);
+    return;
+  }
+
+  const readiness = getAiProviderReadiness();
+  if (!readiness.configured) {
+    await markAiReplyAttempt(attempt.id, {
+      state: "blocked",
+      blockedReason: "provider_not_configured",
+      redactedError: readiness.lastErrorCode,
+    });
+    publishAgentState(organizationId, conversationId);
+    return;
+  }
+
   // Ventana cerrada: el agente JAMÁS envía texto libre → handoff 'ventana'.
   if (!conversation.isTest && !isWindowOpen(conversation.lastInboundAt)) {
     await applyHandoff(conversationId, organizationId, "ventana");
+    await markAiReplyAttempt(attempt.id, {
+      state: "handoff",
+      blockedReason: "outside_window",
+    });
+    publishAgentState(organizationId, conversationId);
     return;
   }
 
   // Patrón de respaldo ANTES del LLM (FR-022).
   if (lastInbound.text && matchesHandoffIntent(lastInbound.text)) {
     await applyHandoff(conversationId, organizationId, "cliente");
+    await markAiReplyAttempt(attempt.id, {
+      state: "handoff",
+      blockedReason: "human_handoff",
+    });
+    publishAgentState(organizationId, conversationId);
     return;
   }
 
-  const kb = await db
-    .select()
-    .from(schema.kbEntry)
-    .where(eq(schema.kbEntry.organizationId, organizationId))
-    .orderBy(asc(schema.kbEntry.createdAt));
+  const kb = await listLiveKbEntries(organizationId);
   const stages = await db
     .select({ id: schema.pipelineStage.id, name: schema.pipelineStage.name })
     .from(schema.pipelineStage)
@@ -155,11 +212,30 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
       })),
   ];
 
+  await markAiReplyAttempt(attempt.id, { state: "generating" });
+  const startedAt = Date.now();
   const result = await chatJson(AgentAction, messages);
   if (!result.ok) {
-    if (result.error === "not_configured") return;
+    if (result.error === "not_configured") {
+      await markAiReplyAttempt(attempt.id, {
+        state: "blocked",
+        blockedReason: "provider_not_configured",
+        redactedError: result.detail,
+      });
+      publishAgentState(organizationId, conversationId);
+      return;
+    }
     // Fallo persistente del proveedor o salida imposible → escalar (FR-022).
     console.error(`[agente] fallo del proveedor (raw): ${result.detail}`);
+    await markAiReplyAttempt(attempt.id, {
+      state: "failed",
+      blockedReason:
+        result.error === "invalid_output"
+          ? "invalid_model_output"
+          : "provider_failed",
+      latencyMs: Date.now() - startedAt,
+      redactedError: result.detail,
+    });
     await applyHandoff(conversationId, organizationId, "error");
     return;
   }
@@ -177,7 +253,7 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
         data: { conversation: { id: conversationId } },
       });
       if (action.reply) {
-        await deliverReply(conversation, action.reply);
+        await deliverReplyAndMark(conversation, action.reply, attempt, startedAt);
       }
       return;
     }
@@ -185,20 +261,33 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
 
   switch (action.action) {
     case "none":
+      await markAiReplyAttempt(attempt.id, { state: "blocked" });
+      publishAgentState(organizationId, conversationId);
       return;
     case "reply":
-      await deliverReply(conversation, action.text);
+      await deliverReplyAndMark(conversation, action.text, attempt, startedAt);
       return;
     case "update_lead": {
       await appendLeadNote(organizationId, conversation.contactId, action.note);
-      if (action.reply) await deliverReply(conversation, action.reply);
+      if (action.reply) {
+        await deliverReplyAndMark(conversation, action.reply, attempt, startedAt);
+      } else {
+        await markAiReplyAttempt(attempt.id, { state: "blocked" });
+        publishAgentState(organizationId, conversationId);
+      }
       return;
     }
     case "handoff": {
       if (action.farewell) {
-        await deliverReply(conversation, action.farewell);
+        await deliverReplyAndMark(conversation, action.farewell, attempt, startedAt);
+      } else {
+        await markAiReplyAttempt(attempt.id, {
+          state: "handoff",
+          blockedReason: "human_handoff",
+        });
       }
       await applyHandoff(conversationId, organizationId, "modelo");
+      publishAgentState(organizationId, conversationId);
       return;
     }
   }
@@ -210,23 +299,51 @@ type Conversation = typeof schema.conversation.$inferSelect;
 async function deliverReply(
   conversation: Conversation,
   text: string
-): Promise<void> {
+): Promise<string | null> {
   if (conversation.isTest) {
-    await persistTestOutbound(conversation, text);
-    return;
+    return persistTestOutbound(conversation, text);
   }
+  const result = await sendText({
+    conversationId: conversation.id,
+    organizationId: conversation.organizationId,
+    text,
+    aiGenerated: true,
+  });
+  return result.messageId;
+}
+
+async function deliverReplyAndMark(
+  conversation: Conversation,
+  text: string,
+  attempt: AiReplyAttempt,
+  startedAt: number
+): Promise<void> {
   try {
-    await sendText({
-      conversationId: conversation.id,
-      organizationId: conversation.organizationId,
-      text,
-      aiGenerated: true,
+    const messageId = await deliverReply(conversation, text);
+    await markAiReplyAttempt(attempt.id, {
+      state: "sent",
+      providerMessageId: messageId,
+      latencyMs: Date.now() - startedAt,
     });
+    publishAgentState(conversation.organizationId, conversation.id);
   } catch (err) {
     if (err instanceof SendError && err.code === "window_closed") {
       await applyHandoff(conversation.id, conversation.organizationId, "ventana");
+      await markAiReplyAttempt(attempt.id, {
+        state: "handoff",
+        blockedReason: "outside_window",
+        latencyMs: Date.now() - startedAt,
+        redactedError: err.message,
+      });
       return;
     }
+    await markAiReplyAttempt(attempt.id, {
+      state: "failed",
+      blockedReason: "send_failed",
+      latencyMs: Date.now() - startedAt,
+      redactedError: err instanceof Error ? err.message : String(err),
+    });
+    publishAgentState(conversation.organizationId, conversation.id);
     throw err;
   }
 }
@@ -235,22 +352,26 @@ async function deliverReply(
 async function persistTestOutbound(
   conversation: Conversation,
   text: string
-): Promise<void> {
+): Promise<string> {
   const db = getDb();
-  await db.insert(schema.message).values({
-    id: newId("message"),
-    organizationId: conversation.organizationId,
-    conversationId: conversation.id,
-    direction: "out",
-    type: "text",
-    text,
-    status: "sent",
-    aiGenerated: true,
-  });
+  const inserted = await db
+    .insert(schema.message)
+    .values({
+      id: newId("message"),
+      organizationId: conversation.organizationId,
+      conversationId: conversation.id,
+      direction: "out",
+      type: "text",
+      text,
+      status: "sent",
+      aiGenerated: true,
+    })
+    .returning();
   await db
     .update(schema.conversation)
     .set({ lastMessageAt: new Date(), updatedAt: new Date() })
     .where(eq(schema.conversation.id, conversation.id));
+  return inserted[0]?.id ?? "";
 }
 
 export async function applyHandoff(
@@ -270,6 +391,13 @@ export async function applyHandoff(
     data: {
       conversation: { id: conversationId, handoffReason: reason },
     },
+  });
+}
+
+function publishAgentState(organizationId: string, conversationId: string) {
+  publish(organizationId, {
+    type: "conversation.updated",
+    data: { conversation: { id: conversationId } },
   });
 }
 

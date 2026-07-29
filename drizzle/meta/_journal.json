@@ -50,6 +50,34 @@
       "when": 1784405313158,
       "tag": "0006_panoramic_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785182400000,
+      "tag": "0007_ai_reply_attempt",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785202200000,
+      "tag": "0008_customer_kb_manager",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785321600000,
+      "tag": "0009_reservation_service_payment_rule",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785325200000,
+      "tag": "0010_manual_payment_verification",
+      "breakpoints": true
     }
   ]
 }

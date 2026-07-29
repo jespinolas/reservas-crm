@@ -1,28 +1,27 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { apiError, parseBody, withAuth } from "@/lib/api";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
+import { archiveKbEntry, kbPatchSchema } from "@/server/kb/manager";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-const patchSchema = z.object({
-  question: z.string().trim().min(1).max(500).optional(),
-  answer: z.string().trim().min(1).max(4000).optional(),
-  content: z.string().trim().min(1).max(8000).optional(),
-});
-
 export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {
   const { id } = await ctx.params;
-  const body = await parseBody(req, patchSchema);
+  const body = await parseBody(req, kbPatchSchema);
   if (!body.ok) return body.response;
 
+  const reviewed = body.data.reviewStatus === "reviewed";
   const db = getDb();
   const updated = await db
     .update(schema.kbEntry)
-    .set({ ...body.data, updatedAt: new Date() })
+    .set({
+      ...body.data,
+      lastReviewedAt: reviewed ? new Date() : undefined,
+      updatedAt: new Date(),
+    })
     .where(
       scoped(
         schema.kbEntry.organizationId,
@@ -37,17 +36,7 @@ export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {
 
 export const DELETE = withAuth(async (session, _req: Request, ctx: Params) => {
   const { id } = await ctx.params;
-  const db = getDb();
-  const deleted = await db
-    .delete(schema.kbEntry)
-    .where(
-      scoped(
-        schema.kbEntry.organizationId,
-        session.organizationId,
-        eq(schema.kbEntry.id, id)
-      )
-    )
-    .returning();
-  if (!deleted[0]) return apiError(404, "not_found", "Entrada no encontrada");
-  return Response.json({ deleted: true });
+  const entry = await archiveKbEntry({ organizationId: session.organizationId, id });
+  if (!entry) return apiError(404, "not_found", "Entrada no encontrada");
+  return Response.json({ archived: true, entry });
 });

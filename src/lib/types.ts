@@ -13,6 +13,37 @@ export type ConversationDto = {
   windowOpen: boolean;
   windowRemainingMs: number;
   preview: string | null;
+  agentState: {
+    enabled: boolean;
+    attemptId: string | null;
+    state:
+      | "disabled"
+      | "not_ready"
+      | "eligible"
+      | "generating"
+      | "sent"
+      | "blocked"
+      | "failed"
+      | "handoff";
+    blockedReason:
+      | "crm_unhealthy"
+      | "db_unavailable"
+      | "provider_not_configured"
+      | "provider_failed"
+      | "conversation_ai_disabled"
+      | "business_ai_disabled"
+      | "human_handoff"
+      | "outside_window"
+      | "duplicate_inbound"
+      | "send_failed"
+      | "invalid_model_output"
+      | null;
+    provider: string | null;
+    model: string | null;
+    latencyMs: number | null;
+    redactedError: string | null;
+    lastAttemptAt: string | null;
+  };
 };
 
 export type MessageDto = {
@@ -67,20 +98,4 @@ export type ReservationListSummaryDto = {
   confirmed: number;
   cancelled: number;
   activeHolds: number;
-};
-
-export type ReservationResourceDto = {
-  id: string;
-  name: string;
-  description: string | null;
-  kind: "football_field" | "room" | "venue" | "cabin" | "other";
-  location: string | null;
-  capacity: number;
-};
-
-export type ReservationServiceDto = {
-  id: string;
-  name: string;
-  description: string | null;
-  durationMinutes: number;
 };

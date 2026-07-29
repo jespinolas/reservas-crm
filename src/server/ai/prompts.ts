@@ -11,8 +11,8 @@ export function renderKb(entries: KbEntry[]): string {
   return entries
     .map((e) =>
       e.kind === "qa"
-        ? `P: ${e.question}\nR: ${e.answer}`
-        : (e.content ?? "")
+        ? `[${e.category}] P: ${e.question}\nR: ${e.answer}`
+        : `[${e.category}] ${e.content ?? ""}`
     )
     .filter(Boolean)
     .join("\n\n");

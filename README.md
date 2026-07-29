@@ -1,12 +1,5 @@
 # Reservas CRM
 
-[![CI](https://github.com/jespinolas/reservas-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/jespinolas/reservas-crm/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/jespinolas/reservas-crm?sort=semver)](https://github.com/jespinolas/reservas-crm/releases)
-[![GHCR](https://img.shields.io/badge/container-GHCR-blue.svg)](https://github.com/jespinolas/reservas-crm/pkgs/container/reservas-crm)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Security Policy](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
-[![Status](https://img.shields.io/badge/status-alpha--ready-orange.svg)](ROADMAP.md)
-
 Open-source CRM for businesses that run conversations and bookings through
 WhatsApp.
 
@@ -81,13 +74,6 @@ docker compose up -d --build
 Fill `.env` with generated secrets before production use. The example file
 documents each required value and includes generation commands.
 
-Fresh install smoke test:
-
-```bash
-corepack enable
-pnpm smoke:fresh-install
-```
-
 Health check:
 
 ```bash
@@ -99,10 +85,7 @@ Detailed setup and operations:
 - [Fresh install smoke test](docs/runbooks/fresh-install-smoke-test.md)
 - [Docker Compose deployment](docs/deployment/docker-compose.md)
 - [Coolify deployment](docs/deployment/coolify.md)
-- [Environment reference](docs/deployment/environment.md)
-- [Security policy](SECURITY.md)
 - [Backups and restores](docs/deployment/backups-and-restores.md)
-- [Upgrades and rollbacks](docs/deployment/upgrades.md)
 
 Local development:
 
