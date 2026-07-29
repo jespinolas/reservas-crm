@@ -219,6 +219,19 @@ export class AiBookingSessionService {
     return created;
   }
 
+  async getSessionByConversation(input: {
+    organizationId: string;
+    conversationId: string;
+  }): Promise<AiBookingSession | null> {
+    const parsed = z
+      .object({
+        organizationId: z.string().min(1),
+        conversationId: z.string().min(1),
+      })
+      .parse(input);
+    return this.repository.findSessionByConversation(parsed);
+  }
+
   async transition(input: {
     session: AiBookingSession;
     toStatus: AiBookingSessionStatus;
