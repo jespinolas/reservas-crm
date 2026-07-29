@@ -698,6 +698,124 @@ export const manualPaymentVerificationHistory = pgTable(
   ]
 );
 
+export const aiBookingSettings = pgTable(
+  "ai_booking_settings",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    mode: text("mode", {
+      enum: ["disabled", "suggest_only", "auto_hold", "manual_payment_confirm"],
+    })
+      .notNull()
+      .default("disabled"),
+    enabledByUserId: text("enabled_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    enabledAt: timestamp("enabled_at"),
+    readinessLastCheckedAt: timestamp("readiness_last_checked_at"),
+    readinessStatus: text("readiness_status", {
+      enum: ["unknown", "ready", "not_ready"],
+    })
+      .notNull()
+      .default("unknown"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("ai_booking_settings_org_uq").on(t.organizationId),
+    index("ai_booking_settings_org_mode_idx").on(t.organizationId, t.mode),
+  ]
+);
+
+export const aiBookingSession = pgTable(
+  "ai_booking_session",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => contact.id, {
+      onDelete: "set null",
+    }),
+    status: text("status", {
+      enum: [
+        "collecting_intent",
+        "showing_options",
+        "awaiting_customer_confirmation",
+        "hold_created",
+        "awaiting_payment_evidence",
+        "awaiting_operator_payment_review",
+        "confirmed",
+        "rejected",
+        "expired",
+        "escalated",
+      ],
+    })
+      .notNull()
+      .default("collecting_intent"),
+    serviceId: text("service_id").references(() => reservationService.id, {
+      onDelete: "set null",
+    }),
+    resourceId: text("resource_id").references(() => resource.id, {
+      onDelete: "set null",
+    }),
+    requestedStartsAt: timestamp("requested_starts_at"),
+    requestedEndsAt: timestamp("requested_ends_at"),
+    partySize: integer("party_size"),
+    selectedOptionJsonRedacted: jsonb("selected_option_json_redacted"),
+    bookingHoldId: text("booking_hold_id").references(() => bookingHold.id, {
+      onDelete: "set null",
+    }),
+    manualPaymentVerificationId: text("manual_payment_verification_id").references(
+      () => manualPaymentVerification.id,
+      { onDelete: "set null" }
+    ),
+    reservationId: text("reservation_id").references(() => reservation.id, {
+      onDelete: "set null",
+    }),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("ai_booking_session_org_conversation_uq").on(
+      t.organizationId,
+      t.conversationId
+    ),
+    index("ai_booking_session_org_status_idx").on(t.organizationId, t.status),
+    index("ai_booking_session_org_contact_idx").on(t.organizationId, t.contactId),
+  ]
+);
+
+export const aiBookingSessionEvent = pgTable(
+  "ai_booking_session_event",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => aiBookingSession.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    actorType: text("actor_type", {
+      enum: ["system", "operator", "ai", "customer"],
+    }).notNull(),
+    actorId: text("actor_id"),
+    metadataRedacted: jsonb("metadata_redacted"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("ai_booking_session_event_session_idx").on(t.sessionId, t.createdAt),
+    index("ai_booking_session_event_org_idx").on(t.organizationId, t.createdAt),
+  ]
+);
+
 export const reservationReminder = pgTable(
   "reservation_reminder",
   {
