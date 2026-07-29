@@ -78,6 +78,13 @@
       "when": 1785325200000,
       "tag": "0010_manual_payment_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785328800000,
+      "tag": "0011_ai_booking_session",
+      "breakpoints": true
     }
   ]
 }
