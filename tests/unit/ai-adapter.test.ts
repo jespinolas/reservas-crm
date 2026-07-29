@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { chatJson, extractJson } from "@/lib/ai";
+import { getAiProviderReadiness } from "@/lib/env";
 
 describe("extractJson (extracción robusta)", () => {
   it("JSON limpio", () => {
@@ -32,7 +33,9 @@ describe("chatJson (reintentos y errores tipados)", () => {
     vi.stubEnv("ENCRYPTION_KEY", Buffer.alloc(32, 3).toString("base64"));
     vi.stubEnv("META_WEBHOOK_VERIFY_TOKEN", "verify-test");
     vi.stubEnv("OPENROUTER_API_TOKEN", "token-test");
-    vi.stubEnv("OPENROUTER_MODEL", "modelo-test");
+    vi.stubEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash");
+    vi.stubEnv("AI_MAX_OUTPUT_TOKENS", "321");
+    vi.stubEnv("AI_PROVIDER_KEY_OWNERSHIP", "managed_customer_isolated");
   });
 
   afterEach(() => {
@@ -58,6 +61,8 @@ describe("chatJson (reintentos y errores tipados)", () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.text).toBe("ok");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
+    expect(firstBody.max_tokens).toBe(321);
     // el reintento agrega la instrucción STRICT
     const secondBody = JSON.parse(fetchMock.mock.calls[1]![1]!.body as string);
     expect(JSON.stringify(secondBody.messages)).toContain("STRICT");
@@ -98,6 +103,39 @@ describe("chatJson (reintentos y errores tipados)", () => {
     const result = await chatJson(schema, [{ role: "user", content: "hola" }]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("not_configured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("readiness expone política de costo sin secretos", () => {
+    const readiness = getAiProviderReadiness();
+
+    expect(readiness).toMatchObject({
+      provider: "openrouter",
+      configured: true,
+      model: "deepseek/deepseek-v4-flash",
+      keyOwnership: "managed_customer_isolated",
+      lastStatus: "ok",
+      costPolicy: {
+        approvedLowCostModel: "deepseek/deepseek-v4-flash",
+        usesApprovedLowCostModel: true,
+        maxOutputTokens: 321,
+        billableProbeDisabled: true,
+      },
+    });
+    expect(JSON.stringify(readiness)).not.toContain("token-test");
+  });
+
+  it("cap diario en cero bloquea llamadas antes de tocar proveedor", async () => {
+    vi.stubEnv("AI_DAILY_REPLY_CAP", "0");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const readiness = getAiProviderReadiness();
+    expect(readiness.lastStatus).toBe("spend_cap_reached");
+
+    const result = await chatJson(schema, [{ role: "user", content: "hola" }]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.detail).toBe("spend_cap_reached");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 # ============================================================
-# Vocero CRM — Ruta B: app + Postgres + Caddy (HTTPS automático)
+# Reservas CRM — Ruta B: app + Postgres + Caddy (HTTPS automático)
 # Uso:  cp .env.example .env  →  rellenar  →  docker compose up -d --build
 # ============================================================
 services:
@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       APP_BASE_URL: ${APP_BASE_URL}
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/vocero
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/reservas_crm
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN}
@@ -31,11 +31,11 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: vocero
+      POSTGRES_DB: reservas_crm
     volumes:
-      - vocero_pg:/var/lib/postgresql/data
+      - reservas_crm_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d vocero"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reservas_crm"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -50,8 +50,8 @@ services:
       DOMAIN: ${DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - vocero_caddy_data:/data
-      - vocero_caddy_config:/config
+      - reservas_crm_caddy_data:/data
+      - reservas_crm_caddy_config:/config
     depends_on:
       - app
     healthcheck:
@@ -61,6 +61,6 @@ services:
       retries: 5
 
 volumes:
-  vocero_pg:
-  vocero_caddy_data:
-  vocero_caddy_config:
+  reservas_crm_pg:
+  reservas_crm_caddy_data:
+  reservas_crm_caddy_config:

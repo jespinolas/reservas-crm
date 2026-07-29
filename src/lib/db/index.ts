@@ -8,7 +8,7 @@ import * as schema from "./schema";
  * globalThis para no agotar conexiones.
  */
 const globalForDb = globalThis as unknown as {
-  __voceroSql?: ReturnType<typeof postgres>;
+  __reservasSql?: ReturnType<typeof postgres>;
 };
 
 function createClient() {
@@ -20,8 +20,8 @@ function createClient() {
 }
 
 export function getSql() {
-  if (!globalForDb.__voceroSql) globalForDb.__voceroSql = createClient();
-  return globalForDb.__voceroSql;
+  if (!globalForDb.__reservasSql) globalForDb.__reservasSql = createClient();
+  return globalForDb.__reservasSql;
 }
 
 let cachedDb: ReturnType<typeof drizzle<typeof schema>> | null = null;

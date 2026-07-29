@@ -45,6 +45,8 @@ export type WebhookMessage = {
   timestamp: string;
   type: string;
   text?: { body: string };
+  image?: { id?: string; caption?: string };
+  document?: { id?: string; caption?: string; filename?: string };
 };
 
 export type WebhookStatus = {

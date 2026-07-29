@@ -50,8 +50,8 @@ describe("ReservationCatalogService", () => {
 
     const resource = await service.createResource({
       organizationId: "org_1",
-      name: "Cancha 1",
-      kind: "football_field",
+      name: "Casa 1",
+      kind: "house",
       location: "Complejo Norte",
       capacity: 10,
       sortOrder: 2,
@@ -73,14 +73,14 @@ describe("ReservationCatalogService", () => {
 
     expect(resource).toMatchObject({
       organizationId: "org_1",
-      name: "Cancha 1",
-      kind: "football_field",
+      name: "Casa 1",
+      kind: "house",
       capacity: 10,
       active: true,
     });
     await expect(service.listResources("org_1")).resolves.toMatchObject([
       { name: "Cancha 0" },
-      { name: "Cancha 1" },
+      { name: "Casa 1" },
     ]);
   });
 
@@ -135,6 +135,42 @@ describe("ReservationCatalogService", () => {
         now,
       })
     ).rejects.toBeInstanceOf(ReservationCatalogError);
+  });
+
+  it("updates and re-enables resources with duplicate-name protection", async () => {
+    const service = catalog();
+    const first = await service.createResource({
+      organizationId: "org_1",
+      name: "Casa 1",
+      kind: "house",
+      now,
+    });
+    await service.createResource({
+      organizationId: "org_1",
+      name: "Casa 2",
+      kind: "house",
+      now,
+    });
+
+    await expect(
+      service.updateResource({
+        organizationId: "org_1",
+        id: first.id,
+        name: "Casa principal",
+        description: "Casa para 8 personas con piscina.",
+        capacity: 8,
+        now,
+      })
+    ).resolves.toMatchObject({
+      name: "Casa principal",
+      description: "Casa para 8 personas con piscina.",
+      capacity: 8,
+    });
+
+    await service.disableResource({ organizationId: "org_1", id: first.id, now });
+    await expect(
+      service.enableResource({ organizationId: "org_1", id: first.id, now })
+    ).resolves.toMatchObject({ id: first.id, active: true });
   });
 
   it("creates services and rejects duplicate active service names per organization", async () => {
@@ -193,5 +229,74 @@ describe("ReservationCatalogService", () => {
     await expect(service.listReservationServices("org_1")).resolves.toMatchObject([
       { id: reservationService.id, active: false },
     ]);
+  });
+
+  it("updates and re-enables services with duplicate-name protection", async () => {
+    const service = catalog();
+    const haircut = await service.createReservationService({
+      organizationId: "org_1",
+      name: "Corte",
+      durationMinutes: 45,
+      now,
+    });
+
+    await expect(
+      service.updateReservationService({
+        organizationId: "org_1",
+        id: haircut.id,
+        name: "Corte premium",
+        description: "Corte con lavado incluido.",
+        durationMinutes: 60,
+        now,
+      })
+    ).resolves.toMatchObject({
+      name: "Corte premium",
+      description: "Corte con lavado incluido.",
+      durationMinutes: 60,
+    });
+
+    await service.disableReservationService({
+      organizationId: "org_1",
+      id: haircut.id,
+      now,
+    });
+    await expect(
+      service.enableReservationService({ organizationId: "org_1", id: haircut.id, now })
+    ).resolves.toMatchObject({ id: haircut.id, active: true });
+  });
+
+  it("reports catalog readiness from active resources and services", async () => {
+    const service = catalog();
+
+    await expect(service.getCatalogReadiness("org_1")).resolves.toMatchObject({
+      ready: false,
+      activeResourceCount: 0,
+      activeServiceCount: 0,
+      missing: ["resources", "services"],
+    });
+
+    await service.createResource({
+      organizationId: "org_1",
+      name: "Casa 3",
+      kind: "house",
+      description: "Casa para 4 personas.",
+      capacity: 4,
+      now,
+    });
+    await service.createReservationService({
+      organizationId: "org_1",
+      name: "Estadía",
+      description: "Reserva por noche.",
+      durationMinutes: 1440,
+      now,
+    });
+
+    await expect(service.getCatalogReadiness("org_1")).resolves.toMatchObject({
+      ready: true,
+      activeResourceCount: 1,
+      activeServiceCount: 1,
+      missing: [],
+      warnings: [],
+    });
   });
 });

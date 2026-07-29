@@ -232,6 +232,64 @@ export const message = pgTable(
   ]
 );
 
+export const aiReplyAttempt = pgTable(
+  "ai_reply_attempt",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    inboundMessageId: text("inbound_message_id")
+      .notNull()
+      .references(() => message.id, { onDelete: "cascade" }),
+    providerMessageId: text("provider_message_id"),
+    state: text("state", {
+      enum: [
+        "disabled",
+        "not_ready",
+        "eligible",
+        "generating",
+        "sent",
+        "blocked",
+        "failed",
+        "handoff",
+      ],
+    }).notNull(),
+    blockedReason: text("blocked_reason", {
+      enum: [
+        "crm_unhealthy",
+        "db_unavailable",
+        "provider_not_configured",
+        "provider_failed",
+        "conversation_ai_disabled",
+        "business_ai_disabled",
+        "human_handoff",
+        "outside_window",
+        "duplicate_inbound",
+        "send_failed",
+        "invalid_model_output",
+      ],
+    }),
+    provider: text("provider"),
+    model: text("model"),
+    latencyMs: integer("latency_ms"),
+    redactedError: text("redacted_error"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("ai_reply_attempt_inbound_uq").on(t.inboundMessageId),
+    index("ai_reply_attempt_org_conv_idx").on(
+      t.organizationId,
+      t.conversationId,
+      t.createdAt
+    ),
+  ]
+);
+
 export const metaCredentials = pgTable(
   "meta_credentials",
   {
@@ -288,7 +346,23 @@ export const resource = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     kind: text("kind", {
-      enum: ["football_field", "room", "venue", "cabin", "other"],
+      enum: [
+        "football_field",
+        "room",
+        "venue",
+        "cabin",
+        "house",
+        "court",
+        "field",
+        "chair",
+        "staff_member",
+        "therapist",
+        "stylist",
+        "vehicle",
+        "table",
+        "professional",
+        "other",
+      ],
     })
       .notNull()
       .default("other"),
@@ -327,6 +401,34 @@ export const reservationService = pgTable(
     uniqueIndex("reservation_service_org_active_name_uq")
       .on(t.organizationId, t.name)
       .where(sql`${t.active} = true`),
+  ]
+);
+
+export const reservationServicePaymentRule = pgTable(
+  "reservation_service_payment_rule",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    serviceId: text("service_id")
+      .notNull()
+      .references(() => reservationService.id, { onDelete: "cascade" }),
+    currency: text("currency").notNull().default("PYG"),
+    amountMinor: integer("amount_minor"),
+    depositType: text("deposit_type").notNull().default("none"),
+    depositAmountMinor: integer("deposit_amount_minor"),
+    depositPercentage: integer("deposit_percentage"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("reservation_service_payment_rule_org_service_uq").on(
+      t.organizationId,
+      t.serviceId
+    ),
+    index("reservation_service_payment_rule_org_idx").on(t.organizationId),
   ]
 );
 
@@ -506,6 +608,96 @@ export const reservationStatusHistory = pgTable(
   (t) => [index("reservation_status_history_reservation_idx").on(t.reservationId)]
 );
 
+export const manualPaymentVerification = pgTable(
+  "manual_payment_verification",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    bookingHoldId: text("booking_hold_id")
+      .notNull()
+      .references(() => bookingHold.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id").references(() => conversation.id, {
+      onDelete: "set null",
+    }),
+    contactId: text("contact_id").references(() => contact.id, {
+      onDelete: "set null",
+    }),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => resource.id),
+    serviceId: text("service_id")
+      .notNull()
+      .references(() => reservationService.id),
+    status: text("status", {
+      enum: [
+        "waiting_for_evidence",
+        "needs_operator_review",
+        "approved",
+        "rejected",
+        "expired",
+        "cancelled",
+      ],
+    })
+      .notNull()
+      .default("waiting_for_evidence"),
+    expectedAmountMinor: integer("expected_amount_minor").notNull(),
+    currency: text("currency").notNull().default("PYG"),
+    evidenceMessageId: text("evidence_message_id").references(() => message.id, {
+      onDelete: "set null",
+    }),
+    evidenceMediaId: text("evidence_media_id"),
+    evidenceStorageRef: text("evidence_storage_ref"),
+    customerReferenceRedacted: text("customer_reference_redacted"),
+    reviewedByUserId: text("reviewed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewed_at"),
+    reviewNote: text("review_note"),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("manual_payment_verification_org_status_idx").on(t.organizationId, t.status),
+    index("manual_payment_verification_org_conversation_idx").on(
+      t.organizationId,
+      t.conversationId
+    ),
+    index("manual_payment_verification_expiration_idx").on(t.status, t.expiresAt),
+    uniqueIndex("manual_payment_verification_org_hold_active_uq")
+      .on(t.organizationId, t.bookingHoldId)
+      .where(
+        sql`${t.status} in ('waiting_for_evidence', 'needs_operator_review')`
+      ),
+  ]
+);
+
+export const manualPaymentVerificationHistory = pgTable(
+  "manual_payment_verification_history",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    verificationId: text("verification_id")
+      .notNull()
+      .references(() => manualPaymentVerification.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    actorType: text("actor_type", { enum: ["system", "operator", "ai"] }).notNull(),
+    actorId: text("actor_id"),
+    reason: text("reason"),
+    metadataRedacted: jsonb("metadata_redacted"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("manual_payment_verification_history_verification_idx").on(t.verificationId),
+    index("manual_payment_verification_history_org_idx").on(t.organizationId),
+  ]
+);
+
 export const reservationReminder = pgTable(
   "reservation_reminder",
   {
@@ -671,10 +863,40 @@ export const kbEntry = pgTable(
     question: text("question"),
     answer: text("answer"),
     content: text("content"),
+    category: text("category", {
+      enum: [
+        "business_profile",
+        "services",
+        "hours",
+        "location",
+        "policies",
+        "pricing_notes",
+        "faq",
+        "escalation",
+        "payment_instructions",
+        "other",
+      ],
+    })
+      .notNull()
+      .default("other"),
+    reviewStatus: text("review_status", {
+      enum: ["draft", "reviewed", "needs_update", "archived"],
+    })
+      .notNull()
+      .default("reviewed"),
+    sourceLabel: text("source_label"),
+    priority: integer("priority").notNull().default(100),
+    active: boolean("active").notNull().default(true),
+    lastReviewedAt: timestamp("last_reviewed_at"),
+    reviewedByUserId: text("reviewed_by_user_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("kb_org_idx").on(t.organizationId)]
+  (t) => [
+    index("kb_org_idx").on(t.organizationId),
+    index("kb_org_status_idx").on(t.organizationId, t.reviewStatus, t.active),
+    index("kb_org_category_idx").on(t.organizationId, t.category),
+  ]
 );
 
 export const template = pgTable(

@@ -1,6 +1,6 @@
 # Guion E2E — US2: Contactos y pipeline kanban
 
-> Conducido con Playwright (MCP) contra `pnpm dev` con el entorno de pruebas
+> Conducido con Playwright contra `pnpm dev` con el entorno de pruebas
 > interno. Continúa el estado del guion de US1 (contactos ya creados por
 > mensajes entrantes).
 

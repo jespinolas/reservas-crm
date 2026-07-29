@@ -16,6 +16,34 @@ const HANDOFF_LABELS: Record<string, string> = {
   ventana: "Ventana de 24h cerrada",
 };
 
+const AGENT_STATE_LABELS: Record<ConversationDto["agentState"]["state"], string> = {
+  disabled: "Desactivado",
+  not_ready: "No listo",
+  eligible: "Esperando mensaje",
+  generating: "Generando respuesta",
+  sent: "Última respuesta enviada",
+  blocked: "Bloqueado",
+  failed: "Falló",
+  handoff: "Atención humana",
+};
+
+const AGENT_BLOCKED_LABELS: Record<
+  Exclude<ConversationDto["agentState"]["blockedReason"], null>,
+  string
+> = {
+  crm_unhealthy: "El CRM no está saludable.",
+  db_unavailable: "La base de datos no está disponible.",
+  provider_not_configured: "Falta configurar el proveedor de IA.",
+  provider_failed: "El proveedor de IA falló.",
+  conversation_ai_disabled: "La IA está pausada en esta conversación.",
+  business_ai_disabled: "El agente del negocio está apagado.",
+  human_handoff: "La conversación fue escalada a humano.",
+  outside_window: "La ventana de WhatsApp de 24 horas está cerrada.",
+  duplicate_inbound: "Ese mensaje ya fue procesado.",
+  send_failed: "No se pudo enviar la respuesta.",
+  invalid_model_output: "La IA devolvió una acción inválida.",
+};
+
 export function ContactPanel({
   conversation,
   refreshKey = 0,
@@ -47,6 +75,15 @@ export function ContactPanel({
   const agentReady = aiConfigured && agentEnabled;
   const aiActive =
     agentReady && conversation.aiEnabled && !conversation.handoffAt;
+  const agentState = conversation.agentState;
+  const agentIssue =
+    agentState.blockedReason ? AGENT_BLOCKED_LABELS[agentState.blockedReason] : null;
+  const lastAttemptLabel = agentState.lastAttemptAt
+    ? new Intl.DateTimeFormat("es-PY", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(new Date(agentState.lastAttemptAt))
+    : null;
 
   // Carga inicial (incluye notas): se re-ejecuta al cambiar de contacto.
   const refetch = useCallback(async () => {
@@ -181,7 +218,7 @@ export function ContactPanel({
                     : conversation.handoffAt
                       ? "En pausa · atención humana"
                       : conversation.aiEnabled
-                        ? "Respondiendo"
+                        ? AGENT_STATE_LABELS[agentState.state]
                         : "En pausa"}
                 </p>
               </div>
@@ -230,6 +267,53 @@ export function ContactPanel({
                     </Link>
                   )}
                 </p>
+              </div>
+            )}
+
+            {agentReady && agentIssue && (
+              <div className="mt-2.5 flex items-start gap-2 rounded-md border border-[#ece2cf] bg-[#faf7f0] p-2.5">
+                <Sparkles
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8a6d3b]"
+                  strokeWidth={1.7}
+                />
+                <p className="text-[11px] leading-relaxed text-[#8a6d3b]">
+                  {agentIssue}
+                  <Link
+                    href="/agent"
+                    className="ml-1 whitespace-nowrap font-medium text-brand-text underline underline-offset-2 hover:text-brand"
+                  >
+                    Revisar agente
+                  </Link>
+                </p>
+              </div>
+            )}
+
+            {agentState.attemptId && (
+              <div className="mt-2.5 rounded-md border bg-background p-2.5">
+                <dl className="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1 text-[11px]">
+                  <dt className="text-text-3">Intento</dt>
+                  <dd className="truncate font-mono text-text-2">
+                    {agentState.attemptId}
+                  </dd>
+                  <dt className="text-text-3">Modelo</dt>
+                  <dd className="truncate text-text-2">
+                    {agentState.provider ?? "sin proveedor"}
+                    {agentState.model ? ` · ${agentState.model}` : ""}
+                  </dd>
+                  <dt className="text-text-3">Latencia</dt>
+                  <dd className="text-text-2">
+                    {agentState.latencyMs === null
+                      ? "sin dato"
+                      : `${agentState.latencyMs} ms`}
+                  </dd>
+                  <dt className="text-text-3">Último</dt>
+                  <dd className="text-text-2">{lastAttemptLabel ?? "sin dato"}</dd>
+                </dl>
+                {agentState.redactedError && (
+                  <p className="mt-2 break-words rounded bg-secondary px-2 py-1.5 font-mono text-[10px] leading-relaxed text-text-2">
+                    {agentState.redactedError}
+                  </p>
+                )}
               </div>
             )}
           </div>

@@ -1,0 +1,52 @@
+name: Bug Report
+description: Report a reproducible problem in reservas-crm.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include secrets, tokens, production IDs, or real customer data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps To Reproduce
+      description: Use placeholder values for credentials and customer data.
+      placeholder: |
+        1. Start the app with ...
+        2. Open ...
+        3. Click ...
+        4. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        reservas-crm version or commit:
+        Node:
+        pnpm:
+        Docker:
+        Browser:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Redact tokens, phone numbers, customer names, and production identifiers.
+      render: shell

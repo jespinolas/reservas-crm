@@ -4,10 +4,15 @@ import {
   signWhatsappProvisioningRequest,
   verifyWhatsappProvisioningRequest,
 } from "@/server/provisioning/whatsapp";
+import {
+  signWhatsappDisconnectRequest,
+  verifyWhatsappDisconnectRequest,
+} from "@/server/provisioning/whatsapp-disconnect";
 
 const now = new Date("2026-07-18T12:00:00.000Z");
 const secret = "crm-provisioning-secret-for-tests";
 const path = "/api/internal/provisioning/whatsapp";
+const disconnectPath = "/api/internal/provisioning/whatsapp/disconnect";
 
 function payload(overrides: Record<string, unknown> = {}) {
   return {
@@ -217,5 +222,89 @@ describe("WhatsApp provisioning auth and payload service", () => {
       provisionedAt: now.toISOString(),
     });
     expect(JSON.stringify(response)).not.toContain("EAAG-smoke-token");
+  });
+});
+
+describe("WhatsApp disconnect auth and payload service", () => {
+  function disconnectPayload(overrides: Record<string, unknown> = {}) {
+    return {
+      version: "2026-07-29",
+      installationId: "inst_test",
+      customerSlug: "sample-customer",
+      wabaId: "waba_test",
+      phoneNumberId: "phone_test",
+      issuedAt: now.toISOString(),
+      ...overrides,
+    };
+  }
+
+  function disconnectHeaders(input: {
+    rawBody: string;
+    timestamp?: string;
+    nonce?: string;
+    installationId?: string;
+    signature?: string;
+  }) {
+    const timestamp = input.timestamp ?? now.toISOString();
+    const nonce = input.nonce ?? "nonce_test";
+    const installationId = input.installationId ?? "inst_test";
+    const signature =
+      input.signature ??
+      signWhatsappDisconnectRequest({
+        method: "POST",
+        path: disconnectPath,
+        timestamp,
+        nonce,
+        installationId,
+        rawBody: input.rawBody,
+        secret,
+      });
+    const values = new Map<string, string>([
+      ["x-reservas-installation-id", installationId],
+      ["x-reservas-timestamp", timestamp],
+      ["x-reservas-nonce", nonce],
+      ["x-reservas-signature", signature],
+    ]);
+    return { get: (name: string) => values.get(name) ?? null };
+  }
+
+  it("accepts a correctly signed disconnect payload", () => {
+    const rawBody = JSON.stringify(disconnectPayload());
+    const result = verifyWhatsappDisconnectRequest({
+      method: "POST",
+      path: disconnectPath,
+      rawBody,
+      headers: disconnectHeaders({ rawBody }),
+      secret,
+      now,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      payload: {
+        installationId: "inst_test",
+        customerSlug: "sample-customer",
+        wabaId: "waba_test",
+        phoneNumberId: "phone_test",
+      },
+    });
+  });
+
+  it("rejects disconnect requests with mismatched installation headers", () => {
+    const rawBody = JSON.stringify(disconnectPayload());
+    const result = verifyWhatsappDisconnectRequest({
+      method: "POST",
+      path: disconnectPath,
+      rawBody,
+      headers: disconnectHeaders({ rawBody, installationId: "inst_other" }),
+      secret,
+      now,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: 422,
+      code: "installation_mismatch",
+    });
   });
 });

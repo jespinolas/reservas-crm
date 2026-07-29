@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { getEnv, isAiConfigured } from "@/lib/env";
+import { getAiProviderReadiness, getEnv, isAiConfigured } from "@/lib/env";
 
 /**
  * Adaptador LLM OpenRouter-compatible — ÚNICA frontera con el proveedor de IA
@@ -26,10 +26,11 @@ export async function chatJson<T>(
   opts?: { model?: string; judge?: boolean; timeoutMs?: number }
 ): Promise<ChatJsonResult<T>> {
   if (!isAiConfigured()) {
+    const readiness = getAiProviderReadiness();
     return {
       ok: false,
       error: "not_configured",
-      detail: "Sin OPENROUTER_API_TOKEN configurado",
+      detail: readiness.lastErrorCode ?? "Proveedor de IA no configurado",
     };
   }
   const env = getEnv();
@@ -107,7 +108,11 @@ async function callProvider(
         Authorization: `Bearer ${env.OPENROUTER_API_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model, messages }),
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: env.AI_MAX_OUTPUT_TOKENS,
+      }),
       signal: controller.signal,
     });
     if (!res.ok) {

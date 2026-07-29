@@ -1,6 +1,6 @@
 # Guion E2E — US4: Laboratorio (SIEMPRE contra ai-mock, determinista)
 
-> Conducido con Playwright (MCP) contra `pnpm dev` con ai-mock. El KB inicial
+> Conducido con Playwright contra `pnpm dev` con ai-mock. El KB inicial
 > NO cubre garantías/devoluciones (hueco intencional del guion).
 
 ## Preparación

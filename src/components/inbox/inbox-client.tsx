@@ -6,11 +6,28 @@ import { PanelRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import type { ConversationDto, MessageDto } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useEvents } from "@/components/use-events";
 import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
 import { Composer } from "./composer";
 import { ContactPanel } from "./contact-panel";
+
+type ManualPaymentVerificationDto = {
+  id: string;
+  bookingHoldId: string;
+  conversationId: string | null;
+  contactId: string | null;
+  resourceId: string;
+  serviceId: string;
+  status: "waiting_for_evidence" | "needs_operator_review";
+  expectedAmountMinor: number;
+  currency: string;
+  customerReferenceRedacted: string | null;
+  expiresAt: string;
+  createdAt: string;
+};
 
 export function InboxClient() {
   const [conversations, setConversations] = useState<ConversationDto[] | null>(
@@ -18,17 +35,20 @@ export function InboxClient() {
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDto[]>([]);
+  const [paymentVerifications, setPaymentVerifications] = useState<
+    ManualPaymentVerificationDto[]
+  >([]);
   const [panelOpen, setPanelOpen] = useState(true);
   // Se incrementa con cada evento SSE que puede cambiar la etapa/lead o el
   // estado del agente: el panel de detalles lo observa y refetch en vivo.
   const [detailRev, setDetailRev] = useState(0);
 
   useEffect(() => {
-    setPanelOpen(localStorage.getItem("vocero.panelOpen") !== "false");
+    setPanelOpen(localStorage.getItem("reservas.panelOpen") !== "false");
   }, []);
   const togglePanel = useCallback((open: boolean) => {
     setPanelOpen(open);
-    localStorage.setItem("vocero.panelOpen", String(open));
+    localStorage.setItem("reservas.panelOpen", String(open));
   }, []);
   const selectedIdRef = useRef<string | null>(null);
   selectedIdRef.current = selectedId;
@@ -51,6 +71,21 @@ export function InboxClient() {
     if (selectedIdRef.current === conversationId) setMessages(data.messages);
   }, []);
 
+  const refetchPaymentVerifications = useCallback(async (conversationId: string) => {
+    const res = await fetch(
+      `/api/payments/manual-verifications?conversationId=${encodeURIComponent(
+        conversationId
+      )}&status=needs_operator_review&status=waiting_for_evidence&limit=5`
+    ).catch(() => null);
+    if (!res?.ok) return;
+    const data = (await res.json()) as {
+      verifications: ManualPaymentVerificationDto[];
+    };
+    if (selectedIdRef.current === conversationId) {
+      setPaymentVerifications(data.verifications);
+    }
+  }, []);
+
   useEffect(() => {
     void refetchConversations();
   }, [refetchConversations]);
@@ -59,14 +94,16 @@ export function InboxClient() {
     (id: string) => {
       setSelectedId(id);
       setMessages([]);
+      setPaymentVerifications([]);
       void refetchMessages(id);
+      void refetchPaymentVerifications(id);
       void fetch(`/api/conversations/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ markRead: true }),
       });
     },
-    [refetchMessages]
+    [refetchMessages, refetchPaymentVerifications]
   );
 
   // Enlace directo desde Contactos/Pipeline: /inbox?contact=<id>
@@ -90,6 +127,7 @@ export function InboxClient() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ markRead: true }),
         });
+        void refetchPaymentVerifications(conversationId);
       }
       void refetchConversations();
       // Un entrante nuevo puede crear/mover el lead: refresca el panel.
@@ -112,6 +150,7 @@ export function InboxClient() {
       // Catch-up tras reconexión (contrato sse.md): refetch completo.
       void refetchConversations();
       if (selectedIdRef.current) void refetchMessages(selectedIdRef.current);
+      if (selectedIdRef.current) void refetchPaymentVerifications(selectedIdRef.current);
       setDetailRev((v) => v + 1);
     },
   });
@@ -154,6 +193,35 @@ export function InboxClient() {
       void refetchConversations();
     },
     [refetchConversations]
+  );
+
+  const decidePaymentVerification = useCallback(
+    async (id: string, action: "approve" | "reject"): Promise<string | null> => {
+      const res = await fetch(`/api/payments/manual-verifications/${id}/${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          action === "approve"
+            ? { note: "Confirmado desde el inbox" }
+            : { reason: "not_received", note: "Marcado como no recibido desde el inbox" }
+        ),
+      }).catch(() => null);
+      if (!res) return "Sin conexión con el servidor";
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        return data?.error?.message ?? "No se pudo procesar el pago";
+      }
+      if (selectedIdRef.current) {
+        void refetchPaymentVerifications(selectedIdRef.current);
+        void refetchMessages(selectedIdRef.current);
+      }
+      void refetchConversations();
+      setDetailRev((v) => v + 1);
+      return null;
+    },
+    [refetchConversations, refetchMessages, refetchPaymentVerifications]
   );
 
   return (
@@ -205,6 +273,10 @@ export function InboxClient() {
               )}
             </header>
             <MessageThread messages={messages} />
+            <PaymentVerificationAlert
+              verifications={paymentVerifications}
+              onDecide={decidePaymentVerification}
+            />
             <Composer
               conversation={selected}
               onSend={sendText}
@@ -241,4 +313,92 @@ export function InboxClient() {
       </section>
     </div>
   );
+}
+
+function PaymentVerificationAlert({
+  verifications,
+  onDecide,
+}: {
+  verifications: ManualPaymentVerificationDto[];
+  onDecide: (id: string, action: "approve" | "reject") => Promise<string | null>;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const verification =
+    verifications.find((item) => item.status === "needs_operator_review") ??
+    verifications[0] ??
+    null;
+  if (!verification) return null;
+
+  async function decide(action: "approve" | "reject") {
+    setBusyId(verification?.id ?? null);
+    setMessage(null);
+    const error = verification ? await onDecide(verification.id, action) : null;
+    setBusyId(null);
+    setMessage(error);
+  }
+
+  return (
+    <div className="border-t bg-[#fff8e8] px-4 py-3">
+      <div className="rounded-lg border border-[#ead8ad] bg-background p-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[#7a5a12]">
+              Confirmar pago manual
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[#7a5a12]/85">
+              ¿Recibiste esta seña de {formatMoneyMinor(verification)} para este cliente?
+            </p>
+            {verification.customerReferenceRedacted && (
+              <p className="mt-1 truncate text-xs text-text-3">
+                Ref: {verification.customerReferenceRedacted}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-text-3">
+              Hold: <span className="font-mono">{verification.bookingHoldId}</span> · expira{" "}
+              {formatDateTime(verification.expiresAt)}
+            </p>
+          </div>
+          <Badge variant="warning">
+            {verification.status === "needs_operator_review"
+              ? "Revisar"
+              : "Esperando comprobante"}
+          </Badge>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            disabled={Boolean(busyId) || verification.status !== "needs_operator_review"}
+            onClick={() => void decide("approve")}
+          >
+            Sí, recibido
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={Boolean(busyId)}
+            onClick={() => void decide("reject")}
+          >
+            No
+          </Button>
+        </div>
+        {message && <p className="mt-2 text-xs text-destructive">{message}</p>}
+      </div>
+    </div>
+  );
+}
+
+function formatMoneyMinor(value: { expectedAmountMinor: number; currency: string }): string {
+  return new Intl.NumberFormat("es-PY", {
+    style: "currency",
+    currency: value.currency,
+    maximumFractionDigits: value.currency === "PYG" ? 0 : 2,
+  }).format(value.expectedAmountMinor);
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("es-PY", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

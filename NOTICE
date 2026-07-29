@@ -1,0 +1,14 @@
+reservas-crm
+
+reservas-crm is an open-source WhatsApp CRM and reservation workflow application
+maintained by Martin Espinola.
+
+This project is derived from Vocero CRM:
+
+- Upstream repository: https://github.com/kevinrivm/vocero-crm
+- Upstream baseline commit: c0e7777e929a6e730c268fb449d756ab9877a4c7
+- Upstream license: MIT
+- Upstream copyright: Copyright (c) 2026 Kevin Belier
+
+The MIT license text is included in LICENSE. Keep this notice and the upstream
+license notice with redistributed copies or substantial portions of the software.

@@ -30,7 +30,7 @@ export default function LoginPage() {
       );
       return;
     }
-    router.push("/inbox");
+    router.push("/setup");
     router.refresh();
   }
 
