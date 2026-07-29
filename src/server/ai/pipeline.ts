@@ -8,12 +8,18 @@ import { isWindowOpen } from "@/server/inbox/window";
 import { SendError, sendText } from "@/server/inbox/send";
 import { AgentAction, degradeAction, resolveStage, type AgentActionType } from "@/server/ai/actions";
 import { matchesHandoffIntent } from "@/server/ai/handoff";
+import { createAiBookingOrchestrator } from "@/server/ai/booking-orchestrator";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import {
   beginAiReplyAttempt,
   markAiReplyAttempt,
   type AiReplyAttempt,
 } from "@/server/ai/reply-attempts";
+import {
+  RESERVATION_TOOL_VERSION,
+  createReservationToolExecutor,
+  type ReservationToolAvailabilityReader,
+} from "@/server/ai/reservation-tools";
 import { listLiveKbEntries } from "@/server/kb/manager";
 
 /**
@@ -290,6 +296,59 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
       publishAgentState(organizationId, conversationId);
       return;
     }
+    case "booking_find_options": {
+      const result = await createAiBookingOrchestrator().presentOptions({
+        context: {
+          organizationId,
+          conversationId,
+          contactId: conversation.contactId,
+          now: new Date(),
+        },
+        serviceId: action.serviceId,
+        rangeStart: action.rangeStart,
+        rangeEnd: action.rangeEnd,
+        partySize: action.partySize ?? null,
+        maxOptions: action.maxOptions ?? 3,
+      });
+      await deliverReplyAndMark(conversation, result.reply, attempt, startedAt);
+      return;
+    }
+    case "booking_confirm_selected_option": {
+      const tools = createReservationToolExecutor(emptyAvailabilityReader);
+      const result = await tools.execute(
+        {
+          version: RESERVATION_TOOL_VERSION,
+          tool: "reservation.create_hold_from_option",
+          customerConfirmed: action.customerConfirmed,
+        },
+        {
+          organizationId,
+          conversationId,
+          contactId: conversation.contactId,
+          now: new Date(),
+        }
+      );
+      if (result.ok && result.tool === "reservation.create_hold_from_option") {
+        await deliverReplyAndMark(
+          conversation,
+          [
+            `Te guardé temporalmente esa opción hasta ${formatChatDateTime(result.hold.expiresAt)}.`,
+            "Si corresponde seña, enviá el comprobante por acá para que el negocio confirme el pago.",
+          ].join(" "),
+          attempt,
+          startedAt
+        );
+        return;
+      }
+      await deliverReplyAndMark(
+        conversation,
+        "No pude guardar esa opción automáticamente. Te deriva una persona del equipo.",
+        attempt,
+        startedAt
+      );
+      await applyHandoff(conversationId, organizationId, "modelo");
+      return;
+    }
   }
 }
 
@@ -399,6 +458,20 @@ function publishAgentState(organizationId: string, conversationId: string) {
     type: "conversation.updated",
     data: { conversation: { id: conversationId } },
   });
+}
+
+const emptyAvailabilityReader: ReservationToolAvailabilityReader = {
+  async listSlots() {
+    return [];
+  },
+};
+
+function formatChatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("es-PY", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Asuncion",
+  }).format(new Date(value));
 }
 
 async function moveLeadToStage(

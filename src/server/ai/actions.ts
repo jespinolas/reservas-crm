@@ -23,6 +23,18 @@ export const AgentAction = z.discriminatedUnion("action", [
     reason: z.string().optional(),
     farewell: z.string().optional(),
   }),
+  z.object({
+    action: z.literal("booking_find_options"),
+    serviceId: z.string().min(1),
+    rangeStart: z.coerce.date(),
+    rangeEnd: z.coerce.date(),
+    partySize: z.number().int().positive().optional(),
+    maxOptions: z.number().int().min(1).max(10).optional(),
+  }),
+  z.object({
+    action: z.literal("booking_confirm_selected_option"),
+    customerConfirmed: z.literal(true),
+  }),
 ]);
 
 export type AgentActionType = z.infer<typeof AgentAction>;
