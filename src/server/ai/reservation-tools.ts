@@ -1,6 +1,14 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import {
+  AiBookingSessionError,
+  AiBookingSessionService,
+  DrizzleAiBookingSessionRepository,
+  type AiBookingSession,
+  type AiBookingSettings,
+} from "@/server/ai/booking-sessions";
 import {
   BookingError,
   type BookingHold,
@@ -42,6 +50,12 @@ export const reservationToolInputSchema = z.discriminatedUnion("tool", [
       startsAt: z.coerce.date(),
       endsAt: z.coerce.date(),
       idempotencyKey: z.string().trim().min(1).max(200),
+    })
+    .strict(),
+  baseToolSchema
+    .extend({
+      tool: z.literal("reservation.create_hold_from_option"),
+      customerConfirmed: z.literal(true),
     })
     .strict(),
   baseToolSchema
@@ -97,6 +111,15 @@ export type ReservationToolResult =
     }
   | {
       ok: true;
+      tool: "reservation.create_hold_from_option";
+      hold: ReturnType<typeof serializeHold>;
+      bookingSession: {
+        id: string;
+        status: AiBookingSession["status"];
+      };
+    }
+  | {
+      ok: true;
       tool: "reservation.confirm_hold";
       reservation: ReturnType<typeof serializeReservation>;
     }
@@ -116,6 +139,8 @@ export type ReservationToolResult =
         | "resource_not_found"
         | "service_not_found"
         | "contact_not_found"
+        | "booking_session_not_found"
+        | "invalid_booking_session"
         | "internal";
       message: string;
     };
@@ -139,11 +164,22 @@ export interface ManualPaymentStatusReader {
   }): Promise<ManualPaymentToolStatusResult>;
 }
 
+export interface AiBookingSessionCoordinator {
+  getSettings(organizationId: string): Promise<AiBookingSettings>;
+  getSessionByConversation(input: {
+    organizationId: string;
+    conversationId: string;
+  }): Promise<AiBookingSession | null>;
+  transition(input: Parameters<AiBookingSessionService["transition"]>[0]): Promise<AiBookingSession>;
+}
+
 export class ReservationToolExecutor {
   constructor(
     private readonly apiService: Pick<ReservationApiService, "createHold" | "confirmHold">,
     private readonly availabilityReader: ReservationToolAvailabilityReader,
-    private readonly paymentStatusReader: ManualPaymentStatusReader = new EmptyManualPaymentStatusReader()
+    private readonly paymentStatusReader: ManualPaymentStatusReader = new EmptyManualPaymentStatusReader(),
+    private readonly bookingSessionCoordinator: AiBookingSessionCoordinator =
+      new EmptyAiBookingSessionCoordinator()
   ) {}
 
   async execute(
@@ -169,6 +205,8 @@ export class ReservationToolExecutor {
           return await this.listAvailability(parsed.data, context);
         case "reservation.create_hold":
           return await this.createHold(parsed.data, context);
+        case "reservation.create_hold_from_option":
+          return await this.createHoldFromOption(parsed.data, context);
         case "reservation.confirm_hold":
           return await this.confirmHold(parsed.data, context);
         case "payment.manual_verification_status":
@@ -214,6 +252,114 @@ export class ReservationToolExecutor {
       now: context.now,
     });
     return { ok: true, tool: input.tool, hold: serializeHold(hold as BookingHold) };
+  }
+
+  private async createHoldFromOption(
+    input: Extract<ReservationToolInput, { tool: "reservation.create_hold_from_option" }>,
+    context: ReservationToolContext
+  ): Promise<ReservationToolResult> {
+    if (!input.customerConfirmed) {
+      return {
+        ok: false,
+        code: "invalid_input",
+        message: "customerConfirmed must be true",
+      };
+    }
+    if (!context.conversationId) {
+      return {
+        ok: false,
+        code: "invalid_input",
+        message: "conversationId is required to create a hold from a booking option",
+      };
+    }
+
+    const settings = await this.bookingSessionCoordinator.getSettings(context.organizationId);
+    if (
+      settings.readinessStatus !== "ready" ||
+      (settings.mode !== "auto_hold" && settings.mode !== "manual_payment_confirm")
+    ) {
+      return {
+        ok: false,
+        code: "booking_not_active",
+        message: "AI booking mode is not ready for auto-holds",
+      };
+    }
+
+    const session = await this.bookingSessionCoordinator.getSessionByConversation({
+      organizationId: context.organizationId,
+      conversationId: context.conversationId,
+    });
+    if (!session) {
+      return {
+        ok: false,
+        code: "booking_session_not_found",
+        message: "Booking session was not found",
+      };
+    }
+    if (session.status !== "awaiting_customer_confirmation" || !session.selectedOptionJsonRedacted) {
+      return {
+        ok: false,
+        code: "invalid_booking_session",
+        message: "Booking session does not have a customer-confirmed selected option",
+      };
+    }
+    if (session.contactId && context.contactId && session.contactId !== context.contactId) {
+      return {
+        ok: false,
+        code: "invalid_booking_session",
+        message: "Booking session contact does not match the conversation context",
+      };
+    }
+
+    const option = session.selectedOptionJsonRedacted;
+    const hold = await this.apiService.createHold({
+      organizationId: context.organizationId,
+      body: {
+        resourceId: option.resourceId,
+        serviceId: option.serviceId,
+        contactId: context.contactId,
+        startsAt: new Date(option.startsAt),
+        endsAt: new Date(option.endsAt),
+        idempotencyKey: createOptionHoldIdempotencyKey({
+          organizationId: context.organizationId,
+          conversationId: context.conversationId,
+          sessionId: session.id,
+          optionId: option.optionId ?? null,
+          resourceId: option.resourceId,
+          serviceId: option.serviceId,
+          startsAt: option.startsAt,
+          endsAt: option.endsAt,
+        }),
+      },
+      now: context.now,
+    });
+    const updatedSession = await this.bookingSessionCoordinator.transition({
+      session,
+      toStatus: "hold_created",
+      actorType: "ai",
+      eventType: "ai_booking.hold_created",
+      bookingHoldId: (hold as BookingHold).id,
+      resourceId: option.resourceId,
+      serviceId: option.serviceId,
+      requestedStartsAt: new Date(option.startsAt),
+      requestedEndsAt: new Date(option.endsAt),
+      partySize: option.partySize ?? session.partySize,
+      expiresAt: (hold as BookingHold).expiresAt,
+      metadataRedacted: {
+        tool: "reservation.create_hold_from_option",
+        customerConfirmed: true,
+      },
+      now: context.now,
+    });
+    return {
+      ok: true,
+      tool: input.tool,
+      hold: serializeHold(hold as BookingHold),
+      bookingSession: {
+        id: updatedSession.id,
+        status: updatedSession.status,
+      },
+    };
   }
 
   private async confirmHold(
@@ -270,7 +416,8 @@ export function createReservationToolExecutor(
   return new ReservationToolExecutor(
     createReservationApiService(),
     availabilityReader,
-    new DrizzleManualPaymentStatusReader()
+    new DrizzleManualPaymentStatusReader(),
+    new AiBookingSessionService(new DrizzleAiBookingSessionRepository())
   );
 }
 
@@ -283,6 +430,31 @@ class EmptyManualPaymentStatusReader implements ManualPaymentStatusReader {
       currency: null,
       expiresAt: null,
     };
+  }
+}
+
+class EmptyAiBookingSessionCoordinator implements AiBookingSessionCoordinator {
+  async getSettings(organizationId: string): Promise<AiBookingSettings> {
+    const now = new Date();
+    return {
+      id: "aibs_empty",
+      organizationId,
+      mode: "disabled",
+      enabledByUserId: null,
+      enabledAt: null,
+      readinessLastCheckedAt: null,
+      readinessStatus: "unknown",
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  async getSessionByConversation(): Promise<AiBookingSession | null> {
+    return null;
+  }
+
+  async transition(): Promise<AiBookingSession> {
+    throw new AiBookingSessionError("invalid_input");
   }
 }
 
@@ -370,9 +542,31 @@ function reservationToolError(error: unknown): ReservationToolResult {
     return { ok: false, code: "booking_not_active", message: "Booking hold is not active" };
   }
 
+  if (error instanceof AiBookingSessionError) {
+    return {
+      ok: false,
+      code: "invalid_booking_session",
+      message: "Booking session transition is not allowed",
+    };
+  }
+
   const response = reservationApiErrorResponseOrNull(error);
   if (response) return response;
   return { ok: false, code: "internal", message: "Reservation tool failed" };
+}
+
+function createOptionHoldIdempotencyKey(input: {
+  organizationId: string;
+  conversationId: string;
+  sessionId: string;
+  optionId: string | null;
+  resourceId: string;
+  serviceId: string;
+  startsAt: string;
+  endsAt: string;
+}): string {
+  const digest = createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 32);
+  return `ai-option-hold:${digest}`;
 }
 
 function reservationApiErrorResponseOrNull(error: unknown): ReservationToolResult | null {
