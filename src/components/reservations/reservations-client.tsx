@@ -21,6 +21,7 @@ import {
   buildBookingReadinessPanelSections,
   type BookingReadinessPanelSectionKey,
 } from "@/lib/booking-readiness-panel-sections";
+import { buildBookingReadinessFocusSummary } from "@/lib/booking-readiness-focus-summary";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -519,6 +520,7 @@ function BookingAutomationReadinessCard({
     demoTitle: summary.demoChecklist.title,
     valueSummary,
   });
+  const focusSummary = buildBookingReadinessFocusSummary(summary);
   const panelSections = buildBookingReadinessPanelSections();
 
   function toggleSection(key: BookingReadinessPanelSectionKey) {
@@ -574,6 +576,38 @@ function BookingAutomationReadinessCard({
           <Button size="sm" variant="secondary" onClick={() => void refetch()}>
             Actualizar
           </Button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold">{focusSummary.title}</p>
+              <Badge
+                variant={
+                  focusSummary.tone === "ready"
+                    ? "success"
+                    : focusSummary.tone === "blocked"
+                      ? "destructive"
+                      : "warning"
+                }
+              >
+                {focusSummary.tone === "ready"
+                  ? "Listo"
+                  : focusSummary.tone === "blocked"
+                    ? "Falta"
+                    : "Revisar"}
+              </Badge>
+            </div>
+            <p className="mt-1 max-w-3xl text-xs text-text-3">{focusSummary.message}</p>
+          </div>
+          {focusSummary.actionHref && focusSummary.actionLabel && (
+            <Link
+              href={focusSummary.actionHref}
+              className="text-xs font-medium text-brand hover:underline"
+            >
+              {focusSummary.actionLabel}
+            </Link>
+          )}
         </div>
 
         <div className="mt-3 grid gap-2 md:grid-cols-2">
