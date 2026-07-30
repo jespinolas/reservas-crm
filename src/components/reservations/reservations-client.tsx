@@ -605,6 +605,51 @@ function BookingAutomationReadinessCard({
           )}
         </div>
 
+        <div className="mt-3 rounded-md border bg-subtle p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold">Checklist de demo</p>
+              <p className="mt-1 text-xs text-text-3">{summary.demoChecklist.message}</p>
+            </div>
+            <Badge
+              variant={
+                summary.demoChecklist.status === "ready"
+                  ? "success"
+                  : summary.demoChecklist.status === "blocked"
+                    ? "destructive"
+                    : "warning"
+              }
+            >
+              {summary.demoChecklist.title}
+            </Badge>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {summary.demoChecklist.items.map((item) => (
+              <div key={item.key} className="rounded-md border bg-background p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium">{item.label}</p>
+                  <Badge
+                    variant={
+                      item.status === "ready"
+                        ? "success"
+                        : item.status === "blocked"
+                          ? "destructive"
+                          : "warning"
+                    }
+                  >
+                    {item.status === "ready"
+                      ? "Listo"
+                      : item.status === "blocked"
+                        ? "Falta"
+                        : "Revisar"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-text-3">{item.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {summary.checks.map((check) => (
             <div key={check.key} className="rounded-md border bg-background p-3">

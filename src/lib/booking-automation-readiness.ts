@@ -30,6 +30,17 @@ export type BookingAutomationReadinessSummary = {
   status: "ready" | "warning" | "blocked";
   title: string;
   message: string;
+  demoChecklist: {
+    status: "ready" | "warning" | "blocked";
+    title: string;
+    message: string;
+    items: Array<{
+      key: string;
+      label: string;
+      status: "ready" | "warning" | "blocked";
+      message: string;
+    }>;
+  };
   issues: Array<{
     key: string;
     label: string;
@@ -63,12 +74,14 @@ export function buildBookingAutomationReadinessSummary(
     calendarMappingsCheck(input.calendarMappings ?? null),
   ];
   const issues = buildReadinessIssues(checks);
+  const demoChecklist = buildDemoChecklist(input, checks);
 
   if (!bookingReady) {
     return {
       status: "blocked",
       title: "Auto-reservas no listas",
       message: "Falta completar requisitos básicos antes de vender reservas 24/7.",
+      demoChecklist,
       issues,
       checks,
     };
@@ -91,6 +104,7 @@ export function buildBookingAutomationReadinessSummary(
           : hasOperationalWarning
             ? "La configuración base está lista, pero hay trabajo operativo pendiente."
             : "La configuración base está lista, pero falta marcarla como lista para vivo.",
+      demoChecklist,
       issues,
       checks,
     };
@@ -100,8 +114,92 @@ export function buildBookingAutomationReadinessSummary(
     status: "ready",
     title: "Auto-reservas listas",
     message: "El negocio tiene la base mínima para operar reservas asistidas por IA.",
+    demoChecklist,
     issues,
     checks,
+  };
+}
+
+function buildDemoChecklist(
+  input: BookingAutomationReadinessInput,
+  checks: BookingAutomationReadinessSummary["checks"]
+): BookingAutomationReadinessSummary["demoChecklist"] {
+  const baseBlocked = checks.some(
+    (check) =>
+      (check.key === "booking_mode" || check.key === "catalog" || check.key === "ai_provider") &&
+      check.status === "blocked"
+  );
+  const paymentReady = input.paymentRules?.ready !== false;
+  const calendarReady = input.calendarMappings?.ready !== false;
+  const pendingReady =
+    input.pendingWork.expired === 0 && input.pendingWork.urgent === 0 && input.pendingWork.stale === 0;
+  const adminReady = input.aiBooking?.liveBookingAllowed ?? false;
+  const items: BookingAutomationReadinessSummary["demoChecklist"]["items"] = [
+    {
+      key: "base_flow",
+      label: "Flujo base",
+      status: baseBlocked ? "blocked" : "ready",
+      message: baseBlocked
+        ? "Falta modo IA, catálogo o proveedor antes de mostrar auto-reservas."
+        : "Modo IA, catálogo y proveedor están listos para demo.",
+    },
+    {
+      key: "payment_setup",
+      label: "Pagos",
+      status: paymentReady ? "ready" : "warning",
+      message: paymentReady
+        ? "Las reglas de precio y seña están cubiertas para servicios activos."
+        : "Hay servicios activos sin regla de precio o seña.",
+    },
+    {
+      key: "calendar_setup",
+      label: "Calendarios",
+      status: calendarReady ? "ready" : "warning",
+      message: calendarReady
+        ? "Los recursos activos tienen calendario conectado o no reportan bloqueo."
+        : "Hay recursos sin calendario conectado o con sync fallida.",
+    },
+    {
+      key: "pending_work",
+      label: "Pendientes",
+      status: pendingReady ? "ready" : "warning",
+      message: pendingReady
+        ? "No hay pagos vencidos, urgentes o sin atender para limpiar antes de demo."
+        : "Conviene limpiar pagos vencidos, urgentes o sin atender antes de demo.",
+    },
+    {
+      key: "admin_signoff",
+      label: "Revisión admin",
+      status: adminReady ? "ready" : baseBlocked ? "blocked" : "warning",
+      message: adminReady
+        ? "La revisión admin permite presentar el flujo como listo."
+        : baseBlocked
+          ? "La revisión admin debe esperar hasta completar el flujo base."
+          : "Falta marcar la preparación como lista antes de venderlo como activo.",
+    },
+  ];
+
+  if (items.some((item) => item.status === "blocked")) {
+    return {
+      status: "blocked",
+      title: "Demo no lista",
+      message: "No conviene mostrar auto-reservas todavía: falta el flujo base.",
+      items,
+    };
+  }
+  if (items.some((item) => item.status === "warning")) {
+    return {
+      status: "warning",
+      title: "Demo con advertencias",
+      message: "Se puede explicar el flujo, pero hay puntos por resolver antes de venderlo como listo.",
+      items,
+    };
+  }
+  return {
+    status: "ready",
+    title: "Demo lista",
+    message: "El setup está en condiciones para mostrar el flujo de auto-reserva 24/7.",
+    items,
   };
 }
 

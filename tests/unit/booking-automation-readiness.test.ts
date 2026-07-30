@@ -36,6 +36,11 @@ describe("buildBookingAutomationReadinessSummary", () => {
       status: "ready",
       title: "Auto-reservas listas",
     });
+    expect(summary.demoChecklist).toMatchObject({
+      status: "ready",
+      title: "Demo lista",
+    });
+    expect(summary.demoChecklist.items.every((item) => item.status === "ready")).toBe(true);
     expect(summary.issues).toEqual([]);
     expect(summary.checks.find((check) => check.key === "pending_work")).toMatchObject({
       status: "ok",
@@ -66,6 +71,16 @@ describe("buildBookingAutomationReadinessSummary", () => {
     });
 
     expect(summary.status).toBe("blocked");
+    expect(summary.demoChecklist).toMatchObject({
+      status: "blocked",
+      title: "Demo no lista",
+    });
+    expect(summary.demoChecklist.items.find((item) => item.key === "base_flow")).toMatchObject({
+      status: "blocked",
+    });
+    expect(summary.demoChecklist.items.find((item) => item.key === "admin_signoff")).toMatchObject({
+      status: "blocked",
+    });
     expect(summary.checks.filter((check) => check.status === "blocked").length).toBeGreaterThan(0);
     expect(summary.issues.map((issue) => issue.severity)).toEqual([
       "blocked",
@@ -96,6 +111,13 @@ describe("buildBookingAutomationReadinessSummary", () => {
     expect(summary).toMatchObject({
       status: "warning",
       title: "Auto-reservas casi listas",
+    });
+    expect(summary.demoChecklist).toMatchObject({
+      status: "warning",
+      title: "Demo con advertencias",
+    });
+    expect(summary.demoChecklist.items.find((item) => item.key === "pending_work")).toMatchObject({
+      status: "warning",
     });
     expect(summary.checks.find((check) => check.key === "pending_work")).toMatchObject({
       status: "warning",
@@ -149,6 +171,40 @@ describe("buildBookingAutomationReadinessSummary", () => {
       "#booking-catalog",
       "#booking-payment-reviews",
     ]);
+  });
+
+  it("warns when admin signoff is missing even if setup checks are healthy", () => {
+    const summary = buildBookingAutomationReadinessSummary({
+      aiBooking: {
+        ...readyAiBooking,
+        liveBookingAllowed: false,
+      },
+      pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
+      paymentRules: {
+        totalActiveServices: 1,
+        configuredServices: 1,
+        missingServiceNames: [],
+        ready: true,
+      },
+      calendarMappings: {
+        totalActiveResources: 1,
+        connectedResources: 1,
+        missingResourceNames: [],
+        unhealthyResourceNames: [],
+        ready: true,
+      },
+    });
+
+    expect(summary.status).toBe("warning");
+    expect(summary.issues).toEqual([]);
+    expect(summary.demoChecklist).toMatchObject({
+      status: "warning",
+      title: "Demo con advertencias",
+    });
+    expect(summary.demoChecklist.items.find((item) => item.key === "admin_signoff")).toMatchObject({
+      status: "warning",
+      message: "Falta marcar la preparación como lista antes de venderlo como activo.",
+    });
   });
 
   it("maps readiness issues to deterministic setup shortcuts", () => {
