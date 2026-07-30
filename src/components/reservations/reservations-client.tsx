@@ -16,6 +16,11 @@ import { buildBookingDemoScript } from "@/lib/booking-demo-script";
 import { buildBookingValueSummary } from "@/lib/booking-value-summary";
 import { buildBookingReadinessExportCopy } from "@/lib/booking-readiness-export-copy";
 import { buildBookingReadinessPrintSummary } from "@/lib/booking-readiness-print-summary";
+import {
+  buildBookingReadinessPanelDefaultState,
+  buildBookingReadinessPanelSections,
+  type BookingReadinessPanelSectionKey,
+} from "@/lib/booking-readiness-panel-sections";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -409,6 +414,9 @@ function BookingAutomationReadinessCard({
   const [savingReadiness, setSavingReadiness] = useState<
     "ready" | "not_ready" | null
   >(null);
+  const [expandedSections, setExpandedSections] = useState<
+    Record<BookingReadinessPanelSectionKey, boolean>
+  >(() => buildBookingReadinessPanelDefaultState());
 
   const refetch = useCallback(async () => {
     const activeServices = services.filter((service) => service.active);
@@ -511,6 +519,11 @@ function BookingAutomationReadinessCard({
     demoTitle: summary.demoChecklist.title,
     valueSummary,
   });
+  const panelSections = buildBookingReadinessPanelSections();
+
+  function toggleSection(key: BookingReadinessPanelSectionKey) {
+    setExpandedSections((current) => ({ ...current, [key]: !current[key] }));
+  }
 
   async function saveReadiness(status: "ready" | "not_ready") {
     if (!readiness) return;
@@ -563,7 +576,28 @@ function BookingAutomationReadinessCard({
           </Button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {panelSections.map((section) => (
+            <button
+              key={section.key}
+              type="button"
+              onClick={() => toggleSection(section.key)}
+              className="rounded-md border bg-background p-3 text-left transition hover:border-brand"
+            >
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold">{section.title}</span>
+                <Badge variant={expandedSections[section.key] ? "secondary" : "warning"}>
+                  {expandedSections[section.key] ? "Abierto" : "Cerrado"}
+                </Badge>
+              </span>
+              <span className="mt-1 block text-xs text-text-3">{section.description}</span>
+            </button>
+          ))}
+        </div>
+
+        {expandedSections.operator_setup && (
+          <>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
           <div>
             <p className="text-xs font-semibold">Revisión admin: {acknowledgement.statusLabel}</p>
             <p className="mt-1 text-xs text-text-3">{acknowledgement.explanation}</p>
@@ -588,9 +622,9 @@ function BookingAutomationReadinessCard({
               {savingReadiness === "not_ready" ? "Guardando…" : "Marcar no lista"}
             </Button>
           </div>
-        </div>
+            </div>
 
-        <div className="mt-3 rounded-md border bg-background p-3">
+            <div className="mt-3 rounded-md border bg-background p-3">
           <p className="text-xs font-semibold">Lo que falta</p>
           {summary.issues.length === 0 ? (
             <p className="mt-1 text-xs text-text-3">
@@ -622,9 +656,9 @@ function BookingAutomationReadinessCard({
               ))}
             </ul>
           )}
-        </div>
+            </div>
 
-        <div className="mt-3 rounded-md border bg-subtle p-3">
+            <div className="mt-3 rounded-md border bg-subtle p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs font-semibold">Checklist de demo</p>
@@ -667,9 +701,13 @@ function BookingAutomationReadinessCard({
               </div>
             ))}
           </div>
-        </div>
+            </div>
+          </>
+        )}
 
-        <div className="mt-3 rounded-md border bg-background p-3">
+        {expandedSections.sales_demo && (
+          <>
+            <div className="mt-3 rounded-md border bg-background p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="text-xs font-semibold">Guion de demo</p>
@@ -703,9 +741,9 @@ function BookingAutomationReadinessCard({
               <p className="mt-1 text-xs leading-relaxed text-text-3">{demoScript.operatorNote}</p>
             </div>
           </div>
-        </div>
+            </div>
 
-        <div className="mt-3 rounded-md border bg-subtle p-3">
+            <div className="mt-3 rounded-md border bg-subtle p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold">Resumen para vender</p>
@@ -736,9 +774,9 @@ function BookingAutomationReadinessCard({
             ))}
           </ul>
           <p className="mt-2 text-xs text-text-3">{valueSummary.caution}</p>
-        </div>
+            </div>
 
-        <div className="mt-3 rounded-md border bg-background p-3">
+            <div className="mt-3 rounded-md border bg-background p-3">
           <p className="text-xs font-semibold">Resumen seguro para copiar</p>
           <p className="mt-1 max-w-2xl text-xs text-text-3">
             Texto sin IDs, teléfonos, calendarios ni referencias de pago para usar en handoffs o notas de venta.
@@ -748,9 +786,9 @@ function BookingAutomationReadinessCard({
             value={exportCopy}
             className="mt-3 min-h-40 w-full resize-y rounded-md border bg-subtle p-3 font-mono text-xs leading-relaxed text-foreground"
           />
-        </div>
+            </div>
 
-        <div className="mt-3 rounded-lg border bg-card p-4">
+            <div className="mt-3 rounded-lg border bg-card p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-text-3">
@@ -781,9 +819,12 @@ function BookingAutomationReadinessCard({
           <p className="mt-3 rounded-md bg-subtle p-2 text-xs text-text-3">
             {printSummary.authorityNote}
           </p>
-        </div>
+            </div>
+          </>
+        )}
 
-        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {expandedSections.operator_setup && (
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {summary.checks.map((check) => (
             <div key={check.key} className="rounded-md border bg-background p-3">
               <div className="flex items-center justify-between gap-2">
@@ -811,7 +852,8 @@ function BookingAutomationReadinessCard({
               <p className="mt-1 text-xs leading-relaxed text-text-3">{check.message}</p>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );
