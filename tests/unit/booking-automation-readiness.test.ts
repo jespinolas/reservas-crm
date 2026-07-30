@@ -17,6 +17,12 @@ describe("buildBookingAutomationReadinessSummary", () => {
     const summary = buildBookingAutomationReadinessSummary({
       aiBooking: readyAiBooking,
       pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
+      paymentRules: {
+        totalActiveServices: 1,
+        configuredServices: 1,
+        missingServiceNames: [],
+        ready: true,
+      },
     });
 
     expect(summary).toMatchObject({
@@ -24,6 +30,9 @@ describe("buildBookingAutomationReadinessSummary", () => {
       title: "Auto-reservas listas",
     });
     expect(summary.checks.find((check) => check.key === "pending_work")).toMatchObject({
+      status: "ok",
+    });
+    expect(summary.checks.find((check) => check.key === "payment_rules")).toMatchObject({
       status: "ok",
     });
   });
@@ -41,6 +50,7 @@ describe("buildBookingAutomationReadinessSummary", () => {
         ],
       },
       pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
+      paymentRules: null,
     });
 
     expect(summary.status).toBe("blocked");
@@ -51,6 +61,12 @@ describe("buildBookingAutomationReadinessSummary", () => {
     const summary = buildBookingAutomationReadinessSummary({
       aiBooking: readyAiBooking,
       pendingWork: { total: 3, urgent: 1, expired: 0, stale: 1 },
+      paymentRules: {
+        totalActiveServices: 1,
+        configuredServices: 1,
+        missingServiceNames: [],
+        ready: true,
+      },
     });
 
     expect(summary).toMatchObject({
@@ -60,6 +76,25 @@ describe("buildBookingAutomationReadinessSummary", () => {
     expect(summary.checks.find((check) => check.key === "pending_work")).toMatchObject({
       status: "warning",
       message: "2 pendiente(s) urgentes o sin atender.",
+    });
+  });
+
+  it("warns when payment-rule coverage is incomplete", () => {
+    const summary = buildBookingAutomationReadinessSummary({
+      aiBooking: readyAiBooking,
+      pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
+      paymentRules: {
+        totalActiveServices: 2,
+        configuredServices: 1,
+        missingServiceNames: ["Spa"],
+        ready: false,
+      },
+    });
+
+    expect(summary.status).toBe("warning");
+    expect(summary.checks.find((check) => check.key === "payment_rules")).toMatchObject({
+      status: "warning",
+      message: "Faltan reglas en 1 servicio(s): Spa",
     });
   });
 });
