@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Search, Sparkles, UserRound } from "lucide-react";
+import { AlertTriangle, CreditCard, Search, Sparkles, UserRound } from "lucide-react";
 import type { ConversationDto } from "@/lib/types";
+import type { BookingAttention } from "@/lib/booking-attention";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -56,18 +57,18 @@ function EmptyState({ onSeeded }: { onSeeded: () => void }) {
 export function ConversationList({
   conversations: conversationsProp,
   selectedId,
-  pendingPaymentConversationIds,
+  bookingAttentionByConversation,
   onSelect,
   onSeeded,
 }: {
   conversations: ConversationDto[] | null;
   selectedId: string | null;
-  pendingPaymentConversationIds?: Set<string>;
+  bookingAttentionByConversation?: Map<string, BookingAttention>;
   onSelect: (id: string) => void;
   onSeeded: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread" | "payments">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "booking">("all");
 
   const loading = conversationsProp === null;
   const conversations = conversationsProp ?? [];
@@ -81,14 +82,14 @@ export function ConversationList({
       )
     : conversations;
   const unreadCount = searched.filter((c) => c.unreadCount > 0).length;
-  const pendingPaymentCount = searched.filter((c) =>
-    pendingPaymentConversationIds?.has(c.id)
+  const bookingAttentionCount = searched.filter((c) =>
+    bookingAttentionByConversation?.has(c.id)
   ).length;
   const visible =
     filter === "unread"
       ? searched.filter((c) => c.unreadCount > 0)
-      : filter === "payments"
-        ? searched.filter((c) => pendingPaymentConversationIds?.has(c.id))
+      : filter === "booking"
+        ? searched.filter((c) => bookingAttentionByConversation?.has(c.id))
         : searched;
 
   return (
@@ -114,7 +115,7 @@ export function ConversationList({
           [
             { id: "all", label: "Todas", count: searched.length },
             { id: "unread", label: "No leídas", count: unreadCount },
-            { id: "payments", label: "Pagos", count: pendingPaymentCount },
+            { id: "booking", label: "Reservas", count: bookingAttentionCount },
           ] as const
         ).map((f) => (
           <button
@@ -154,7 +155,7 @@ export function ConversationList({
             {visible.map((c) => {
               const unread = c.unreadCount > 0;
               const active = selectedId === c.id;
-              const needsPaymentReview = pendingPaymentConversationIds?.has(c.id) ?? false;
+              const bookingAttention = bookingAttentionByConversation?.get(c.id) ?? null;
               return (
                 <li key={c.id} className="relative border-b border-border/70">
                   {active && (
@@ -225,13 +226,21 @@ export function ConversationList({
                             Atención humana
                           </span>
                         )}
-                        {needsPaymentReview && (
+                        {bookingAttention && (
                           <Badge
-                            variant="warning"
+                            variant={
+                              bookingAttention.level === "expired" ? "destructive" : "warning"
+                            }
                             className="gap-1 px-2 py-0.5 text-[11px]"
+                            title={bookingAttention.title}
                           >
-                            <CreditCard className="h-3 w-3" strokeWidth={1.7} />
-                            Pago
+                            {bookingAttention.level === "expired" ||
+                            bookingAttention.level === "urgent" ? (
+                              <AlertTriangle className="h-3 w-3" strokeWidth={1.7} />
+                            ) : (
+                              <CreditCard className="h-3 w-3" strokeWidth={1.7} />
+                            )}
+                            {bookingAttention.label}
                           </Badge>
                         )}
                       </span>

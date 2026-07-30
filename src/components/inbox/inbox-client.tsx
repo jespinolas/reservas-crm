@@ -6,6 +6,7 @@ import { PanelRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import type { ConversationDto, MessageDto } from "@/lib/types";
+import { buildBookingAttentionMap, type BookingAttention } from "@/lib/booking-attention";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEvents } from "@/components/use-events";
@@ -38,8 +39,8 @@ export function InboxClient() {
   const [paymentVerifications, setPaymentVerifications] = useState<
     ManualPaymentVerificationDto[]
   >([]);
-  const [pendingPaymentReviewConversationIds, setPendingPaymentReviewConversationIds] =
-    useState<Set<string>>(new Set());
+  const [bookingAttentionByConversation, setBookingAttentionByConversation] =
+    useState<Map<string, BookingAttention>>(new Map());
   const [replyDraft, setReplyDraft] = useState<{ id: number; text: string } | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   // Se incrementa con cada evento SSE que puede cambiar la etapa/lead o el
@@ -89,27 +90,21 @@ export function InboxClient() {
     }
   }, []);
 
-  const refetchPendingPaymentReviews = useCallback(async () => {
+  const refetchBookingAttention = useCallback(async () => {
     const res = await fetch(
-      "/api/payments/manual-verifications?status=needs_operator_review&limit=100"
+      "/api/payments/manual-verifications?status=needs_operator_review&status=waiting_for_evidence&limit=100"
     ).catch(() => null);
     if (!res?.ok) return;
     const data = (await res.json()) as {
       verifications: ManualPaymentVerificationDto[];
     };
-    setPendingPaymentReviewConversationIds(
-      new Set(
-        data.verifications
-          .map((verification) => verification.conversationId)
-          .filter((conversationId): conversationId is string => Boolean(conversationId))
-      )
-    );
+    setBookingAttentionByConversation(buildBookingAttentionMap(data.verifications));
   }, []);
 
   useEffect(() => {
     void refetchConversations();
-    void refetchPendingPaymentReviews();
-  }, [refetchConversations, refetchPendingPaymentReviews]);
+    void refetchBookingAttention();
+  }, [refetchConversations, refetchBookingAttention]);
 
   const select = useCallback(
     (id: string) => {
@@ -150,7 +145,7 @@ export function InboxClient() {
           body: JSON.stringify({ markRead: true }),
         });
         void refetchPaymentVerifications(conversationId);
-        void refetchPendingPaymentReviews();
+        void refetchBookingAttention();
       }
       void refetchConversations();
       // Un entrante nuevo puede crear/mover el lead: refresca el panel.
@@ -166,7 +161,7 @@ export function InboxClient() {
     },
     onConversationUpdated: () => {
       void refetchConversations();
-      void refetchPendingPaymentReviews();
+      void refetchBookingAttention();
       // El agente movió de etapa o cambió el handoff: refresca el panel en vivo.
       setDetailRev((v) => v + 1);
     },
@@ -175,7 +170,7 @@ export function InboxClient() {
       void refetchConversations();
       if (selectedIdRef.current) void refetchMessages(selectedIdRef.current);
       if (selectedIdRef.current) void refetchPaymentVerifications(selectedIdRef.current);
-      void refetchPendingPaymentReviews();
+      void refetchBookingAttention();
       setDetailRev((v) => v + 1);
     },
   });
@@ -242,7 +237,7 @@ export function InboxClient() {
         void refetchPaymentVerifications(selectedIdRef.current);
         void refetchMessages(selectedIdRef.current);
       }
-      void refetchPendingPaymentReviews();
+      void refetchBookingAttention();
       void refetchConversations();
       setDetailRev((v) => v + 1);
       return null;
@@ -251,7 +246,7 @@ export function InboxClient() {
       refetchConversations,
       refetchMessages,
       refetchPaymentVerifications,
-      refetchPendingPaymentReviews,
+      refetchBookingAttention,
     ]
   );
 
@@ -261,7 +256,7 @@ export function InboxClient() {
         <ConversationList
           conversations={conversations}
           selectedId={selectedId}
-          pendingPaymentConversationIds={pendingPaymentReviewConversationIds}
+          bookingAttentionByConversation={bookingAttentionByConversation}
           onSelect={select}
           onSeeded={() => void refetchConversations()}
         />
