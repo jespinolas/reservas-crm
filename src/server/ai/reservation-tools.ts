@@ -21,6 +21,10 @@ import {
   serializeReservation,
   type ReservationApiService,
 } from "@/server/reservations/api";
+import {
+  createManualPaymentVerificationService,
+  type ManualPaymentVerification,
+} from "@/server/payments/manual-verifications";
 import type { AvailabilitySlot } from "@/server/reservations/availability";
 
 export const RESERVATION_TOOL_VERSION = "2026-07-18";
@@ -117,6 +121,7 @@ export type ReservationToolResult =
         id: string;
         status: AiBookingSession["status"];
       };
+      paymentVerification: ReturnType<typeof serializeAiPaymentVerification> | null;
     }
   | {
       ok: true;
@@ -173,13 +178,27 @@ export interface AiBookingSessionCoordinator {
   transition(input: Parameters<AiBookingSessionService["transition"]>[0]): Promise<AiBookingSession>;
 }
 
+export interface ManualPaymentRequestCreator {
+  createReviewRequest(input: {
+    organizationId: string;
+    holdId: string;
+    conversationId?: string | null;
+    expectedAmountMinor: number;
+    currency: string;
+    expiresAt?: Date;
+    now?: Date;
+  }): Promise<ManualPaymentVerification>;
+}
+
 export class ReservationToolExecutor {
   constructor(
     private readonly apiService: Pick<ReservationApiService, "createHold" | "confirmHold">,
     private readonly availabilityReader: ReservationToolAvailabilityReader,
     private readonly paymentStatusReader: ManualPaymentStatusReader = new EmptyManualPaymentStatusReader(),
     private readonly bookingSessionCoordinator: AiBookingSessionCoordinator =
-      new EmptyAiBookingSessionCoordinator()
+      new EmptyAiBookingSessionCoordinator(),
+    private readonly paymentRequestCreator: ManualPaymentRequestCreator =
+      new EmptyManualPaymentRequestCreator()
   ) {}
 
   async execute(
@@ -333,7 +352,7 @@ export class ReservationToolExecutor {
       },
       now: context.now,
     });
-    const updatedSession = await this.bookingSessionCoordinator.transition({
+    const holdCreatedSession = await this.bookingSessionCoordinator.transition({
       session,
       toStatus: "hold_created",
       actorType: "ai",
@@ -351,15 +370,64 @@ export class ReservationToolExecutor {
       },
       now: context.now,
     });
+    const payment = await this.maybeCreatePaymentVerification({
+      context,
+      hold: hold as BookingHold,
+      session: holdCreatedSession,
+      option,
+    });
     return {
       ok: true,
       tool: input.tool,
       hold: serializeHold(hold as BookingHold),
       bookingSession: {
-        id: updatedSession.id,
-        status: updatedSession.status,
+        id: payment.session.id,
+        status: payment.session.status,
       },
+      paymentVerification: payment.verification
+        ? serializeAiPaymentVerification(payment.verification)
+        : null,
     };
+  }
+
+  private async maybeCreatePaymentVerification(input: {
+    context: ReservationToolContext;
+    hold: BookingHold;
+    session: AiBookingSession;
+    option: NonNullable<AiBookingSession["selectedOptionJsonRedacted"]>;
+  }): Promise<{ session: AiBookingSession; verification: ManualPaymentVerification | null }> {
+    if (
+      !input.option.depositRequired ||
+      input.option.depositAmountMinor == null ||
+      input.option.depositAmountMinor <= 0 ||
+      !input.option.currency
+    ) {
+      return { session: input.session, verification: null };
+    }
+
+    const verification = await this.paymentRequestCreator.createReviewRequest({
+      organizationId: input.context.organizationId,
+      holdId: input.hold.id,
+      conversationId: input.context.conversationId ?? null,
+      expectedAmountMinor: input.option.depositAmountMinor,
+      currency: input.option.currency,
+      expiresAt: input.hold.expiresAt,
+      now: input.context.now,
+    });
+    const session = await this.bookingSessionCoordinator.transition({
+      session: input.session,
+      toStatus: "awaiting_payment_evidence",
+      actorType: "ai",
+      eventType: "ai_booking.payment_evidence_requested",
+      manualPaymentVerificationId: verification.id,
+      metadataRedacted: {
+        verificationId: verification.id,
+        expectedAmountMinor: verification.expectedAmountMinor,
+        currency: verification.currency,
+      },
+      now: input.context.now,
+    });
+    return { session, verification };
   }
 
   private async confirmHold(
@@ -417,7 +485,8 @@ export function createReservationToolExecutor(
     createReservationApiService(),
     availabilityReader,
     new DrizzleManualPaymentStatusReader(),
-    new AiBookingSessionService(new DrizzleAiBookingSessionRepository())
+    new AiBookingSessionService(new DrizzleAiBookingSessionRepository()),
+    createManualPaymentVerificationService()
   );
 }
 
@@ -455,6 +524,12 @@ class EmptyAiBookingSessionCoordinator implements AiBookingSessionCoordinator {
 
   async transition(): Promise<AiBookingSession> {
     throw new AiBookingSessionError("invalid_input");
+  }
+}
+
+class EmptyManualPaymentRequestCreator implements ManualPaymentRequestCreator {
+  async createReviewRequest(): Promise<ManualPaymentVerification> {
+    throw new Error("manual_payment_request_creator_not_configured");
   }
 }
 
@@ -594,4 +669,15 @@ function responseStatusToMessage(status: number): string {
   return status === 404
     ? "Reservation tool referenced a missing CRM record"
     : "Reservation tool request cannot be completed";
+}
+
+function serializeAiPaymentVerification(verification: ManualPaymentVerification) {
+  return {
+    id: verification.id,
+    bookingHoldId: verification.bookingHoldId,
+    status: verification.status,
+    expectedAmountMinor: verification.expectedAmountMinor,
+    currency: verification.currency,
+    expiresAt: verification.expiresAt.toISOString(),
+  };
 }

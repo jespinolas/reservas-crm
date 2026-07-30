@@ -4,6 +4,7 @@ import {
   ReservationToolExecutor,
   reservationToolInputSchema,
   type AiBookingSessionCoordinator,
+  type ManualPaymentRequestCreator,
   type ManualPaymentStatusReader,
   type ReservationToolAvailabilityReader,
 } from "@/server/ai/reservation-tools";
@@ -16,6 +17,7 @@ import {
   type BookingHold,
   type Reservation,
 } from "@/server/reservations/booking";
+import type { ManualPaymentVerification } from "@/server/payments/manual-verifications";
 
 const now = new Date("2026-07-18T12:00:00.000Z");
 
@@ -187,8 +189,8 @@ describe("reservation AI tool contracts", () => {
     });
   });
 
-  it("creates holds only from the CRM-selected booking session option", async () => {
-    const { executor, apiService, bookingSessionCoordinator } = fixture();
+  it("creates holds and payment requests only from the CRM-selected booking session option", async () => {
+    const { executor, apiService, bookingSessionCoordinator, paymentRequestCreator } = fixture();
     bookingSessionCoordinator.settings = {
       ...bookingSessionCoordinator.settings,
       mode: "manual_payment_confirm",
@@ -207,6 +209,7 @@ describe("reservation AI tool contracts", () => {
         partySize: 4,
         depositRequired: true,
         depositAmountMinor: 240000,
+        currency: "PYG",
       },
     };
 
@@ -224,7 +227,14 @@ describe("reservation AI tool contracts", () => {
       tool: "reservation.create_hold_from_option",
       bookingSession: {
         id: "aibses_1",
-        status: "hold_created",
+        status: "awaiting_payment_evidence",
+      },
+      paymentVerification: {
+        id: "mpv_1",
+        bookingHoldId: "hold_1",
+        status: "waiting_for_evidence",
+        expectedAmountMinor: 240000,
+        currency: "PYG",
       },
     });
     expect(apiService.createHoldCalls[0]).toMatchObject({
@@ -249,6 +259,56 @@ describe("reservation AI tool contracts", () => {
       resourceId: "res_3",
       serviceId: "rsvc_house",
     });
+    expect(paymentRequestCreator.calls[0]).toMatchObject({
+      organizationId: "org_1",
+      holdId: "hold_1",
+      conversationId: "cv_1",
+      expectedAmountMinor: 240000,
+      currency: "PYG",
+    });
+    expect(bookingSessionCoordinator.transitionCalls[1]).toMatchObject({
+      toStatus: "awaiting_payment_evidence",
+      actorType: "ai",
+      manualPaymentVerificationId: "mpv_1",
+    });
+  });
+
+  it("does not request manual payment when the selected option has no deposit", async () => {
+    const { executor, bookingSessionCoordinator, paymentRequestCreator } = fixture();
+    bookingSessionCoordinator.settings = {
+      ...bookingSessionCoordinator.settings,
+      mode: "auto_hold",
+      readinessStatus: "ready",
+    };
+    bookingSessionCoordinator.session = {
+      ...bookingSessionCoordinator.session,
+      status: "awaiting_customer_confirmation",
+      selectedOptionJsonRedacted: {
+        optionId: "opt_free",
+        resourceId: "res_1",
+        serviceId: "rsvc_1",
+        startsAt: "2026-07-20T21:00:00.000Z",
+        endsAt: "2026-07-20T22:00:00.000Z",
+        depositRequired: false,
+      },
+    };
+
+    const result = await executor.execute(
+      {
+        version: RESERVATION_TOOL_VERSION,
+        tool: "reservation.create_hold_from_option",
+        customerConfirmed: true,
+      },
+      { ...context(), conversationId: "cv_1" }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      tool: "reservation.create_hold_from_option",
+      bookingSession: { status: "hold_created" },
+      paymentVerification: null,
+    });
+    expect(paymentRequestCreator.calls).toHaveLength(0);
   });
 
   it("blocks create-hold-from-option when AI booking is not ready", async () => {
@@ -342,16 +402,19 @@ function fixture() {
   const availabilityReader = new FakeAvailabilityReader();
   const paymentStatusReader = new FakePaymentStatusReader();
   const bookingSessionCoordinator = new FakeBookingSessionCoordinator();
+  const paymentRequestCreator = new FakeManualPaymentRequestCreator();
   return {
     apiService,
     availabilityReader,
     paymentStatusReader,
     bookingSessionCoordinator,
+    paymentRequestCreator,
     executor: new ReservationToolExecutor(
       apiService,
       availabilityReader,
       paymentStatusReader,
-      bookingSessionCoordinator
+      bookingSessionCoordinator,
+      paymentRequestCreator
     ),
   };
 }
@@ -487,6 +550,8 @@ class FakeBookingSessionCoordinator implements AiBookingSessionCoordinator {
       ...input.session,
       status: input.toStatus,
       bookingHoldId: input.bookingHoldId ?? input.session.bookingHoldId,
+      manualPaymentVerificationId:
+        input.manualPaymentVerificationId ?? input.session.manualPaymentVerificationId,
       serviceId: input.serviceId ?? input.session.serviceId,
       resourceId: input.resourceId ?? input.session.resourceId,
       requestedStartsAt: input.requestedStartsAt ?? input.session.requestedStartsAt,
@@ -496,5 +561,37 @@ class FakeBookingSessionCoordinator implements AiBookingSessionCoordinator {
       updatedAt: input.now ?? now,
     };
     return this.session;
+  }
+}
+
+class FakeManualPaymentRequestCreator implements ManualPaymentRequestCreator {
+  calls: unknown[] = [];
+
+  async createReviewRequest(
+    input: Parameters<ManualPaymentRequestCreator["createReviewRequest"]>[0]
+  ): Promise<ManualPaymentVerification> {
+    this.calls.push(input);
+    return {
+      id: "mpv_1",
+      organizationId: input.organizationId,
+      bookingHoldId: input.holdId,
+      conversationId: input.conversationId ?? null,
+      contactId: "ct_1",
+      resourceId: "res_3",
+      serviceId: "rsvc_house",
+      status: "waiting_for_evidence",
+      expectedAmountMinor: input.expectedAmountMinor,
+      currency: input.currency,
+      evidenceMessageId: null,
+      evidenceMediaId: null,
+      evidenceStorageRef: null,
+      customerReferenceRedacted: null,
+      reviewedByUserId: null,
+      reviewedAt: null,
+      reviewNote: null,
+      expiresAt: input.expiresAt ?? new Date("2026-07-18T12:10:00.000Z"),
+      createdAt: input.now ?? now,
+      updatedAt: input.now ?? now,
+    };
   }
 }
