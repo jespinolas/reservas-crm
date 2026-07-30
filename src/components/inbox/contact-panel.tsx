@@ -8,6 +8,7 @@ import { cn, formatPhone } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { buildBookingExpiryGuard } from "@/lib/booking-expiry-guard";
 import { buildBookingReplyDraftActions } from "@/lib/booking-reply-drafts";
 
 type BookingSessionStatus =
@@ -614,6 +615,10 @@ function BookingOperatorPanel({
     session,
     paymentVerification: verification,
   });
+  const expiryGuard = buildBookingExpiryGuard({
+    session,
+    paymentVerification: verification,
+  });
 
   return (
     <section className="border-b p-4">
@@ -672,6 +677,39 @@ function BookingOperatorPanel({
               <dd className="text-text-2">{formatMaybeDateTime(session.expiresAt)}</dd>
             </dl>
           </div>
+
+          {expiryGuard && (
+            <div
+              className={cn(
+                "rounded-md border p-3",
+                expiryGuard.level === "expired"
+                  ? "border-destructive/30 bg-destructive/10"
+                  : "border-[#ead8ad] bg-[#fff8e8]"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "text-[13px] font-semibold",
+                      expiryGuard.level === "expired" ? "text-destructive" : "text-[#7a5a12]"
+                    )}
+                  >
+                    {expiryGuard.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-text-2">
+                    {expiryGuard.message}
+                  </p>
+                  <p className="mt-1 text-xs text-text-3">{expiryGuard.actionHint}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-background px-2 py-1 text-[10px] font-semibold text-text-2">
+                  {expiryGuard.level === "expired"
+                    ? "Vencido"
+                    : `${expiryGuard.minutesRemaining} min`}
+                </span>
+              </div>
+            </div>
+          )}
 
           {verification && (
             <div className="rounded-md border border-[#ead8ad] bg-[#fff8e8] p-3">
