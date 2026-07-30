@@ -7,6 +7,7 @@ import type {
   ReservationListItemDto,
   ReservationListSummaryDto,
 } from "@/lib/types";
+import { buildBookingAutomationReadinessSummary } from "@/lib/booking-automation-readiness";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { formatPhone } from "@/lib/utils";
@@ -121,6 +122,13 @@ type ManualPaymentVerification = {
   customerReferenceRedacted: string | null;
   expiresAt: string;
   createdAt: string;
+};
+
+type AiBookingReadiness = {
+  ready: boolean;
+  liveBookingAllowed: boolean;
+  mode: "disabled" | "suggest_only" | "auto_hold" | "manual_payment_confirm";
+  checks: Array<{ key: string; ok: boolean; message: string }>;
 };
 
 type ResourceCalendarMappingDto = {
@@ -314,6 +322,8 @@ export function ReservationsClient() {
         <SummaryTile label="Canceladas" value={summary.cancelled} />
       </section>
 
+      <BookingAutomationReadinessCard />
+
       <CatalogPanel
         resources={resources}
         services={services}
@@ -367,6 +377,124 @@ export function ReservationsClient() {
         </div>
       </div>
     </div>
+  );
+}
+
+function BookingAutomationReadinessCard() {
+  const [readiness, setReadiness] = useState<AiBookingReadiness | null>(null);
+  const [pendingVerifications, setPendingVerifications] = useState<ManualPaymentVerification[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    const [readinessRes, pendingRes] = await Promise.all([
+      fetch("/api/agent/booking-readiness").catch(() => null),
+      fetch(
+        "/api/payments/manual-verifications?status=needs_operator_review&status=waiting_for_evidence&limit=100"
+      ).catch(() => null),
+    ]);
+    if (!readinessRes?.ok || !pendingRes?.ok) {
+      setMessage("No se pudo cargar la preparación de auto-reservas.");
+      return;
+    }
+    const readinessData = (await readinessRes.json()) as { readiness: AiBookingReadiness };
+    const pendingData = (await pendingRes.json()) as {
+      verifications: ManualPaymentVerification[];
+    };
+    setReadiness(readinessData.readiness);
+    setPendingVerifications(pendingData.verifications);
+    setMessage(null);
+  }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  const queue = useMemo(
+    () =>
+      buildPendingBookingWorkQueue(
+        pendingVerifications.filter(
+          (
+            verification
+          ): verification is ManualPaymentVerification & {
+            status: "waiting_for_evidence" | "needs_operator_review";
+          } =>
+            verification.status === "waiting_for_evidence" ||
+            verification.status === "needs_operator_review"
+        )
+      ),
+    [pendingVerifications]
+  );
+  const summary = useMemo(
+    () =>
+      buildBookingAutomationReadinessSummary({
+        aiBooking: readiness,
+        pendingWork: queue.summary,
+      }),
+    [readiness, queue.summary]
+  );
+
+  return (
+    <section className="border-b px-6 py-5">
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">Preparación de auto-reservas</h3>
+              <Badge
+                variant={
+                  summary.status === "ready"
+                    ? "success"
+                    : summary.status === "blocked"
+                      ? "destructive"
+                      : "warning"
+                }
+              >
+                {summary.status === "ready"
+                  ? "Lista"
+                  : summary.status === "blocked"
+                    ? "Bloqueada"
+                    : "Revisar"}
+              </Badge>
+            </div>
+            <p className="mt-1 max-w-2xl text-xs text-text-3">{summary.message}</p>
+            {message && <p className="mt-2 text-xs text-destructive">{message}</p>}
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => void refetch()}>
+            Actualizar
+          </Button>
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {summary.checks.map((check) => (
+            <div key={check.key} className="rounded-md border bg-background p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold">{check.label}</p>
+                <Badge
+                  variant={
+                    check.status === "ok"
+                      ? "success"
+                      : check.status === "blocked"
+                        ? "destructive"
+                        : check.status === "warning"
+                          ? "warning"
+                          : "secondary"
+                  }
+                >
+                  {check.status === "ok"
+                    ? "OK"
+                    : check.status === "blocked"
+                      ? "Falta"
+                      : check.status === "warning"
+                        ? "Revisar"
+                        : "Info"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-text-3">{check.message}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
