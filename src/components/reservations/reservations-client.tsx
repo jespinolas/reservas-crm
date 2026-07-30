@@ -11,6 +11,7 @@ import { buildBookingAutomationReadinessSummary } from "@/lib/booking-automation
 import { buildCalendarMappingCoverage } from "@/lib/calendar-mapping-coverage";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { buildBookingReadinessAcknowledgementActions } from "@/lib/booking-readiness-acknowledgement";
+import { buildBookingReadinessHistorySummary } from "@/lib/booking-readiness-history";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -132,6 +133,7 @@ type AiBookingReadiness = {
   liveBookingAllowed: boolean;
   mode: "disabled" | "suggest_only" | "auto_hold" | "manual_payment_confirm";
   storedReadinessStatus: "unknown" | "ready" | "not_ready";
+  readinessLastCheckedAt: string | null;
   checks: Array<{ key: string; ok: boolean; message: string }>;
 };
 
@@ -487,6 +489,9 @@ function BookingAutomationReadinessCard({
     summaryStatus: summary.status,
     storedReadinessStatus: readiness?.storedReadinessStatus ?? "unknown",
   });
+  const history = buildBookingReadinessHistorySummary({
+    readinessLastCheckedAt: readiness?.readinessLastCheckedAt ?? null,
+  });
 
   async function saveReadiness(status: "ready" | "not_ready") {
     if (!readiness) return;
@@ -543,6 +548,9 @@ function BookingAutomationReadinessCard({
           <div>
             <p className="text-xs font-semibold">Revisión admin: {acknowledgement.statusLabel}</p>
             <p className="mt-1 text-xs text-text-3">{acknowledgement.explanation}</p>
+            <p className="mt-1 text-xs text-text-3">
+              Última revisión: <span title={history.title}>{history.label}</span>
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
