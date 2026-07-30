@@ -11,6 +11,12 @@ export type BookingAutomationReadinessInput = {
     expired: number;
     stale: number;
   };
+  paymentRules?: {
+    totalActiveServices: number;
+    configuredServices: number;
+    missingServiceNames: string[];
+    ready: boolean;
+  } | null;
 };
 
 export type BookingAutomationReadinessSummary = {
@@ -38,12 +44,7 @@ export function buildBookingAutomationReadinessSummary(
     catalogCheck(input.aiBooking),
     aiProviderCheck(input.aiBooking),
     pendingWorkCheck(input.pendingWork),
-    {
-      key: "payment_rules",
-      label: "Reglas de pago",
-      status: "info",
-      message: "Configuralas por servicio; la cobertura total se medirá en una próxima versión.",
-    },
+    paymentRulesCheck(input.paymentRules ?? null),
     {
       key: "calendar_mapping",
       label: "Calendarios",
@@ -61,13 +62,16 @@ export function buildBookingAutomationReadinessSummary(
     };
   }
 
-  if (!liveAllowed || hasOperationalWarning) {
+  if (!liveAllowed || hasOperationalWarning || input.paymentRules?.ready === false) {
     return {
       status: "warning",
       title: "Auto-reservas casi listas",
-      message: hasOperationalWarning
-        ? "La configuración base está lista, pero hay trabajo operativo pendiente."
-        : "La configuración base está lista, pero falta marcarla como lista para vivo.",
+      message:
+        input.paymentRules?.ready === false
+          ? "La configuración base está lista, pero faltan reglas de pago en servicios activos."
+          : hasOperationalWarning
+            ? "La configuración base está lista, pero hay trabajo operativo pendiente."
+            : "La configuración base está lista, pero falta marcarla como lista para vivo.",
       checks,
     };
   }
@@ -133,6 +137,35 @@ function pendingWorkCheck(input: BookingAutomationReadinessInput["pendingWork"])
     label: "Trabajo pendiente",
     status: "ok" as const,
     message: input.total === 0 ? "Sin pendientes operativos." : `${input.total} pendiente(s) normales.`,
+  };
+}
+
+function paymentRulesCheck(
+  input: NonNullable<BookingAutomationReadinessInput["paymentRules"]> | null
+) {
+  if (!input) {
+    return {
+      key: "payment_rules",
+      label: "Reglas de pago",
+      status: "info" as const,
+      message: "Configuralas por servicio; no se pudo medir cobertura todavía.",
+    };
+  }
+  if (input.ready) {
+    return {
+      key: "payment_rules",
+      label: "Reglas de pago",
+      status: "ok" as const,
+      message: `${input.configuredServices}/${input.totalActiveServices} servicio(s) activo(s) con precio configurado.`,
+    };
+  }
+  const examples = input.missingServiceNames.slice(0, 3).join(", ");
+  const more = input.missingServiceNames.length > 3 ? "…" : "";
+  return {
+    key: "payment_rules",
+    label: "Reglas de pago",
+    status: "warning" as const,
+    message: `Faltan reglas en ${input.missingServiceNames.length} servicio(s): ${examples}${more}`,
   };
 }
 

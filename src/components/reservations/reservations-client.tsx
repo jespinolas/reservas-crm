@@ -10,6 +10,7 @@ import type {
 import { buildBookingAutomationReadinessSummary } from "@/lib/booking-automation-readiness";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
+import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -322,7 +323,7 @@ export function ReservationsClient() {
         <SummaryTile label="Canceladas" value={summary.cancelled} />
       </section>
 
-      <BookingAutomationReadinessCard />
+      <BookingAutomationReadinessCard services={services} />
 
       <CatalogPanel
         resources={resources}
@@ -380,12 +381,16 @@ export function ReservationsClient() {
   );
 }
 
-function BookingAutomationReadinessCard() {
+function BookingAutomationReadinessCard({ services }: { services: CatalogService[] }) {
   const [readiness, setReadiness] = useState<AiBookingReadiness | null>(null);
   const [pendingVerifications, setPendingVerifications] = useState<ManualPaymentVerification[]>([]);
+  const [paymentRulesByServiceId, setPaymentRulesByServiceId] = useState<
+    Map<string, ServicePaymentRule | null>
+  >(new Map());
   const [message, setMessage] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
+    const activeServices = services.filter((service) => service.active);
     const [readinessRes, pendingRes] = await Promise.all([
       fetch("/api/agent/booking-readiness").catch(() => null),
       fetch(
@@ -400,10 +405,21 @@ function BookingAutomationReadinessCard() {
     const pendingData = (await pendingRes.json()) as {
       verifications: ManualPaymentVerification[];
     };
+    const ruleResults = await Promise.all(
+      activeServices.map(async (service) => {
+        const response = await fetch(
+          `/api/reservations/services/${service.id}/payment-rule`
+        ).catch(() => null);
+        if (!response?.ok) return [service.id, null] as const;
+        const data = (await response.json()) as { paymentRule: ServicePaymentRule | null };
+        return [service.id, data.paymentRule] as const;
+      })
+    );
     setReadiness(readinessData.readiness);
     setPendingVerifications(pendingData.verifications);
+    setPaymentRulesByServiceId(new Map(ruleResults));
     setMessage(null);
-  }, []);
+  }, [services]);
 
   useEffect(() => {
     void refetch();
@@ -429,8 +445,12 @@ function BookingAutomationReadinessCard() {
       buildBookingAutomationReadinessSummary({
         aiBooking: readiness,
         pendingWork: queue.summary,
+        paymentRules: buildPaymentRuleCoverage({
+          services,
+          rulesByServiceId: paymentRulesByServiceId,
+        }),
       }),
-    [readiness, queue.summary]
+    [readiness, queue.summary, services, paymentRulesByServiceId]
   );
 
   return (
