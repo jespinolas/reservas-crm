@@ -9,10 +9,12 @@ import { TemplateSender } from "./template-sender";
 
 export function Composer({
   conversation,
+  replyDraft,
   onSend,
   onSent,
 }: {
   conversation: ConversationDto;
+  replyDraft?: { id: number; text: string } | null;
   onSend: (text: string) => Promise<string | null>;
   onSent: () => void;
 }) {
@@ -21,6 +23,13 @@ export function Composer({
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<TemplateDto[]>([]);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!replyDraft) return;
+    setText(replyDraft.text);
+    taRef.current?.focus();
+    setTimeout(autogrow, 0);
+  }, [replyDraft]);
 
   useEffect(() => {
     let cancelled = false;

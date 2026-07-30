@@ -8,6 +8,7 @@ import { cn, formatPhone } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { buildBookingReplyDraftActions } from "@/lib/booking-reply-drafts";
 
 type BookingSessionStatus =
   | "collecting_intent"
@@ -150,6 +151,7 @@ export function ContactPanel({
   conversation,
   refreshKey = 0,
   onPatchConversation,
+  onUseReplyDraft,
   onClose,
 }: {
   conversation: ConversationDto;
@@ -159,6 +161,7 @@ export function ContactPanel({
     aiEnabled?: boolean;
     reactivate?: boolean;
   }) => Promise<void>;
+  onUseReplyDraft: (text: string) => void;
   onClose: () => void;
 }) {
   const [notes, setNotes] = useState("");
@@ -537,6 +540,8 @@ export function ContactPanel({
           state={bookingPanel}
           error={bookingPanelError}
           busyAction={bookingAction}
+          canUseReplyDraft={conversation.windowOpen}
+          onUseReplyDraft={onUseReplyDraft}
           onApprove={() => void decidePaymentVerification("approve")}
           onReject={() => void decidePaymentVerification("reject")}
           onEscalate={() => void escalateBookingSession()}
@@ -573,6 +578,8 @@ function BookingOperatorPanel({
   state,
   error,
   busyAction,
+  canUseReplyDraft,
+  onUseReplyDraft,
   onApprove,
   onReject,
   onEscalate,
@@ -580,6 +587,8 @@ function BookingOperatorPanel({
   state: BookingPanelState | null;
   error: string | null;
   busyAction: "approve" | "reject" | "escalate" | null;
+  canUseReplyDraft: boolean;
+  onUseReplyDraft: (text: string) => void;
   onApprove: () => void;
   onReject: () => void;
   onEscalate: () => void;
@@ -591,6 +600,10 @@ function BookingOperatorPanel({
   const canEscalate =
     Boolean(session) &&
     !["confirmed", "rejected", "expired", "escalated"].includes(session?.status ?? "");
+  const replyDrafts = buildBookingReplyDraftActions({
+    session,
+    paymentVerification: verification,
+  });
 
   return (
     <section className="border-b p-4">
@@ -702,6 +715,37 @@ function BookingOperatorPanel({
             >
               {busyAction === "escalate" ? "Escalando…" : "Pasar a humano"}
             </Button>
+          )}
+
+          {replyDrafts.length > 0 && (
+            <div className="rounded-md border bg-secondary/40 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                Respuestas rápidas
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {replyDrafts.map((draft) => (
+                  <Button
+                    key={draft.id}
+                    size="sm"
+                    variant="secondary"
+                    disabled={!canUseReplyDraft}
+                    title={
+                      canUseReplyDraft
+                        ? draft.text
+                        : "La ventana de 24 horas está cerrada; usa una plantilla aprobada."
+                    }
+                    onClick={() => onUseReplyDraft(draft.text)}
+                  >
+                    {draft.label}
+                  </Button>
+                ))}
+              </div>
+              {!canUseReplyDraft && (
+                <p className="mt-2 text-xs text-text-3">
+                  Ventana cerrada: usa una plantilla aprobada para retomar.
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
