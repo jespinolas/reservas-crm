@@ -40,6 +40,7 @@ export function InboxClient() {
   >([]);
   const [pendingPaymentReviewConversationIds, setPendingPaymentReviewConversationIds] =
     useState<Set<string>>(new Set());
+  const [replyDraft, setReplyDraft] = useState<{ id: number; text: string } | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   // Se incrementa con cada evento SSE que puede cambiar la etapa/lead o el
   // estado del agente: el panel de detalles lo observa y refetch en vivo.
@@ -115,6 +116,7 @@ export function InboxClient() {
       setSelectedId(id);
       setMessages([]);
       setPaymentVerifications([]);
+      setReplyDraft(null);
       void refetchMessages(id);
       void refetchPaymentVerifications(id);
       void fetch(`/api/conversations/${id}`, {
@@ -309,6 +311,7 @@ export function InboxClient() {
             />
             <Composer
               conversation={selected}
+              replyDraft={replyDraft}
               onSend={sendText}
               onSent={() => {
                 if (selectedIdRef.current)
@@ -336,6 +339,7 @@ export function InboxClient() {
               conversation={selected}
               refreshKey={detailRev}
               onPatchConversation={patchConversation}
+              onUseReplyDraft={(text) => setReplyDraft({ id: Date.now(), text })}
               onClose={() => togglePanel(false)}
             />
           </div>
