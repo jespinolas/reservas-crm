@@ -9,6 +9,86 @@ import { ContactAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
+type BookingSessionStatus =
+  | "collecting_intent"
+  | "showing_options"
+  | "awaiting_customer_confirmation"
+  | "hold_created"
+  | "awaiting_payment_evidence"
+  | "awaiting_operator_payment_review"
+  | "confirmed"
+  | "rejected"
+  | "expired"
+  | "escalated";
+
+type SelectedBookingOption = {
+  optionId?: string;
+  resourceId: string;
+  resourceName?: string;
+  serviceId: string;
+  serviceName?: string;
+  startsAt: string;
+  endsAt: string;
+  partySize?: number;
+  capacity?: number;
+  currency?: string;
+  amountMinor?: number;
+  depositRequired?: boolean;
+  depositAmountMinor?: number;
+};
+
+type BookingSessionDto = {
+  id: string;
+  conversationId: string;
+  contactId: string | null;
+  status: BookingSessionStatus;
+  serviceId: string | null;
+  resourceId: string | null;
+  requestedStartsAt: string | null;
+  requestedEndsAt: string | null;
+  partySize: number | null;
+  selectedOptionJsonRedacted: SelectedBookingOption | null;
+  bookingHoldId: string | null;
+  manualPaymentVerificationId: string | null;
+  reservationId: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ManualPaymentVerificationDto = {
+  id: string;
+  bookingHoldId: string;
+  conversationId: string | null;
+  contactId: string | null;
+  resourceId: string;
+  serviceId: string;
+  status:
+    | "waiting_for_evidence"
+    | "needs_operator_review"
+    | "approved"
+    | "rejected"
+    | "expired"
+    | "cancelled";
+  expectedAmountMinor: number;
+  currency: string;
+  evidenceMessageId: string | null;
+  evidenceMediaId: string | null;
+  evidenceStorageRef: string | null;
+  customerReferenceRedacted: string | null;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type BookingPanelState = {
+  bookingSession: BookingSessionDto | null;
+  paymentVerification: ManualPaymentVerificationDto | null;
+};
+
 const HANDOFF_LABELS: Record<string, string> = {
   cliente: "El cliente pidió un humano",
   modelo: "El agente decidió escalar",
@@ -44,6 +124,28 @@ const AGENT_BLOCKED_LABELS: Record<
   invalid_model_output: "La IA devolvió una acción inválida.",
 };
 
+const BOOKING_STATUS_LABELS: Record<BookingSessionStatus, string> = {
+  collecting_intent: "Recolectando datos",
+  showing_options: "Mostrando opciones",
+  awaiting_customer_confirmation: "Esperando elección",
+  hold_created: "Hold creado",
+  awaiting_payment_evidence: "Esperando comprobante",
+  awaiting_operator_payment_review: "Revisar pago",
+  confirmed: "Reserva confirmada",
+  rejected: "Pago rechazado",
+  expired: "Expirado",
+  escalated: "Atención humana",
+};
+
+const PAYMENT_STATUS_LABELS: Record<ManualPaymentVerificationDto["status"], string> = {
+  waiting_for_evidence: "Esperando comprobante",
+  needs_operator_review: "Revisión pendiente",
+  approved: "Pago aprobado",
+  rejected: "Pago rechazado",
+  expired: "Expirado",
+  cancelled: "Cancelado",
+};
+
 export function ContactPanel({
   conversation,
   refreshKey = 0,
@@ -69,8 +171,14 @@ export function ContactPanel({
   // cuando el agente aún no se ha configurado/encendido.
   const [agentEnabled, setAgentEnabled] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
+  const [bookingPanel, setBookingPanel] = useState<BookingPanelState | null>(null);
+  const [bookingPanelError, setBookingPanelError] = useState<string | null>(null);
+  const [bookingAction, setBookingAction] = useState<
+    "approve" | "reject" | "escalate" | null
+  >(null);
 
   const contactId = conversation.contact.id;
+  const conversationId = conversation.id;
 
   const agentReady = aiConfigured && agentEnabled;
   const aiActive =
@@ -103,6 +211,19 @@ export function ContactPanel({
     setNotesLoaded(true);
   }, [contactId]);
 
+  const refetchBookingPanel = useCallback(async () => {
+    const res = await fetch(`/api/conversations/${conversationId}/booking-session`).catch(
+      () => null
+    );
+    if (!res?.ok) {
+      setBookingPanelError("No se pudo cargar la reserva de esta conversación.");
+      return;
+    }
+    const data = (await res.json()) as BookingPanelState;
+    setBookingPanel(data);
+    setBookingPanelError(null);
+  }, [conversationId]);
+
   // Refetch en vivo (etapa/lead + estado del agente) SIN tocar las notas, para
   // no pisar lo que el operador esté escribiendo. Lo dispara el SSE.
   const refreshLive = useCallback(async () => {
@@ -123,12 +244,14 @@ export function ContactPanel({
   useEffect(() => {
     setNotesLoaded(false);
     void refetch();
-  }, [refetch]);
+    void refetchBookingPanel();
+  }, [refetch, refetchBookingPanel]);
 
   useEffect(() => {
     if (!notesLoaded) return; // la carga inicial ya trae el estado fresco
     void refreshLive();
-  }, [refreshKey, notesLoaded, refreshLive]);
+    void refetchBookingPanel();
+  }, [refreshKey, notesLoaded, refreshLive, refetchBookingPanel]);
 
   async function moveToStage(stageId: string) {
     if (!leadId || stageId === currentStageId) return;
@@ -149,6 +272,49 @@ export function ContactPanel({
       body: JSON.stringify({ notes }),
     }).catch(() => null);
     setSavingNotes(false);
+  }
+
+  async function decidePaymentVerification(action: "approve" | "reject") {
+    const verification = bookingPanel?.paymentVerification;
+    if (!verification) return;
+    setBookingAction(action);
+    setBookingPanelError(null);
+    const res = await fetch(`/api/payments/manual-verifications/${verification.id}/${action}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        action === "approve"
+          ? { note: "Confirmado desde el panel del inbox" }
+          : {
+              reason: "not_received",
+              note: "Marcado como no recibido desde el panel del inbox",
+            }
+      ),
+    }).catch(() => null);
+    setBookingAction(null);
+    if (!res?.ok) {
+      const data = (await res?.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      setBookingPanelError(data?.error?.message ?? "No se pudo procesar el pago.");
+    }
+    await refetchBookingPanel();
+  }
+
+  async function escalateBookingSession() {
+    setBookingAction("escalate");
+    setBookingPanelError(null);
+    const res = await fetch(`/api/conversations/${conversationId}/booking-session/escalate`, {
+      method: "POST",
+    }).catch(() => null);
+    setBookingAction(null);
+    if (!res?.ok) {
+      const data = (await res?.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      setBookingPanelError(data?.error?.message ?? "No se pudo escalar la reserva.");
+    }
+    await refetchBookingPanel();
   }
 
   const currentIndex = stages.findIndex((s) => s.id === currentStageId);
@@ -367,6 +533,15 @@ export function ContactPanel({
           </section>
         )}
 
+        <BookingOperatorPanel
+          state={bookingPanel}
+          error={bookingPanelError}
+          busyAction={bookingAction}
+          onApprove={() => void decidePaymentVerification("approve")}
+          onReject={() => void decidePaymentVerification("reject")}
+          onEscalate={() => void escalateBookingSession()}
+        />
+
         {/* Notas */}
         <section className="p-4">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-3">
@@ -392,4 +567,164 @@ export function ContactPanel({
       </div>
     </div>
   );
+}
+
+function BookingOperatorPanel({
+  state,
+  error,
+  busyAction,
+  onApprove,
+  onReject,
+  onEscalate,
+}: {
+  state: BookingPanelState | null;
+  error: string | null;
+  busyAction: "approve" | "reject" | "escalate" | null;
+  onApprove: () => void;
+  onReject: () => void;
+  onEscalate: () => void;
+}) {
+  const session = state?.bookingSession ?? null;
+  const verification = state?.paymentVerification ?? null;
+  const option = session?.selectedOptionJsonRedacted ?? null;
+  const canReview = verification?.status === "needs_operator_review";
+  const canEscalate =
+    Boolean(session) &&
+    !["confirmed", "rejected", "expired", "escalated"].includes(session?.status ?? "");
+
+  return (
+    <section className="border-b p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+          Reserva AI
+        </p>
+        {session && (
+          <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold text-text-2">
+            {BOOKING_STATUS_LABELS[session.status]}
+          </span>
+        )}
+      </div>
+
+      {!session && !error && (
+        <div className="rounded-md border bg-secondary/40 p-3">
+          <p className="text-[13px] font-medium text-text-2">Sin reserva activa</p>
+          <p className="mt-1 text-xs leading-relaxed text-text-3">
+            Cuando la IA cree un hold o pida una seña, el estado aparecerá acá.
+          </p>
+        </div>
+      )}
+
+      {session && (
+        <div className="space-y-3">
+          <div className="rounded-md border bg-background p-3">
+            <p className="text-[13px] font-semibold text-foreground">
+              {option?.resourceName ?? session.resourceId ?? "Recurso por definir"}
+            </p>
+            <p className="mt-1 text-xs text-text-3">
+              {option?.serviceName ?? session.serviceId ?? "Servicio por definir"}
+            </p>
+            <dl className="mt-3 grid grid-cols-[78px_1fr] gap-x-2 gap-y-1 text-[11px]">
+              <dt className="text-text-3">Fecha</dt>
+              <dd className="text-text-2">
+                {formatMaybeDateTime(option?.startsAt ?? session.requestedStartsAt)}
+              </dd>
+              <dt className="text-text-3">Personas</dt>
+              <dd className="text-text-2">
+                {option?.partySize ?? session.partySize ?? "sin dato"}
+              </dd>
+              <dt className="text-text-3">Total</dt>
+              <dd className="text-text-2">
+                {option?.amountMinor != null && option.currency
+                  ? formatMoneyMinor({
+                      expectedAmountMinor: option.amountMinor,
+                      currency: option.currency,
+                    })
+                  : "sin dato"}
+              </dd>
+              <dt className="text-text-3">Hold</dt>
+              <dd className="truncate font-mono text-text-2">
+                {session.bookingHoldId ?? "sin hold"}
+              </dd>
+              <dt className="text-text-3">Expira</dt>
+              <dd className="text-text-2">{formatMaybeDateTime(session.expiresAt)}</dd>
+            </dl>
+          </div>
+
+          {verification && (
+            <div className="rounded-md border border-[#ead8ad] bg-[#fff8e8] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-[#7a5a12]">
+                    Seña manual
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-[#7a5a12]/85">
+                    {formatMoneyMinor(verification)} ·{" "}
+                    {PAYMENT_STATUS_LABELS[verification.status]}
+                  </p>
+                  {verification.customerReferenceRedacted && (
+                    <p className="mt-1 truncate text-xs text-text-3">
+                      Ref: {verification.customerReferenceRedacted}
+                    </p>
+                  )}
+                </div>
+                <span className="rounded-full bg-background px-2 py-1 text-[10px] font-semibold text-[#7a5a12]">
+                  {PAYMENT_STATUS_LABELS[verification.status]}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={!canReview || Boolean(busyAction)}
+                  onClick={onApprove}
+                >
+                  {busyAction === "approve" ? "Confirmando…" : "Sí, recibido"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!canReview || Boolean(busyAction)}
+                  onClick={onReject}
+                >
+                  {busyAction === "reject" ? "Marcando…" : "No"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {canEscalate && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              disabled={Boolean(busyAction)}
+              onClick={onEscalate}
+            >
+              {busyAction === "escalate" ? "Escalando…" : "Pasar a humano"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </section>
+  );
+}
+
+function formatMaybeDateTime(value?: string | null): string {
+  if (!value) return "sin dato";
+  return new Intl.DateTimeFormat("es-PY", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function formatMoneyMinor(value: { expectedAmountMinor: number; currency: string }): string {
+  const amount =
+    value.currency === "PYG" ? value.expectedAmountMinor : value.expectedAmountMinor / 100;
+  return new Intl.NumberFormat("es-PY", {
+    style: "currency",
+    currency: value.currency,
+    maximumFractionDigits: value.currency === "PYG" ? 0 : 2,
+  }).format(amount);
 }

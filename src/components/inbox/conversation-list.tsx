@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Sparkles, UserRound } from "lucide-react";
+import { CreditCard, Search, Sparkles, UserRound } from "lucide-react";
 import type { ConversationDto } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatTime, previewText } from "./helpers";
 
@@ -55,16 +56,18 @@ function EmptyState({ onSeeded }: { onSeeded: () => void }) {
 export function ConversationList({
   conversations: conversationsProp,
   selectedId,
+  pendingPaymentConversationIds,
   onSelect,
   onSeeded,
 }: {
   conversations: ConversationDto[] | null;
   selectedId: string | null;
+  pendingPaymentConversationIds?: Set<string>;
   onSelect: (id: string) => void;
   onSeeded: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "payments">("all");
 
   const loading = conversationsProp === null;
   const conversations = conversationsProp ?? [];
@@ -78,8 +81,15 @@ export function ConversationList({
       )
     : conversations;
   const unreadCount = searched.filter((c) => c.unreadCount > 0).length;
+  const pendingPaymentCount = searched.filter((c) =>
+    pendingPaymentConversationIds?.has(c.id)
+  ).length;
   const visible =
-    filter === "unread" ? searched.filter((c) => c.unreadCount > 0) : searched;
+    filter === "unread"
+      ? searched.filter((c) => c.unreadCount > 0)
+      : filter === "payments"
+        ? searched.filter((c) => pendingPaymentConversationIds?.has(c.id))
+        : searched;
 
   return (
     <div className="flex h-full flex-col">
@@ -104,6 +114,7 @@ export function ConversationList({
           [
             { id: "all", label: "Todas", count: searched.length },
             { id: "unread", label: "No leídas", count: unreadCount },
+            { id: "payments", label: "Pagos", count: pendingPaymentCount },
           ] as const
         ).map((f) => (
           <button
@@ -143,6 +154,7 @@ export function ConversationList({
             {visible.map((c) => {
               const unread = c.unreadCount > 0;
               const active = selectedId === c.id;
+              const needsPaymentReview = pendingPaymentConversationIds?.has(c.id) ?? false;
               return (
                 <li key={c.id} className="relative border-b border-border/70">
                   {active && (
@@ -212,6 +224,15 @@ export function ConversationList({
                             <UserRound className="h-3 w-3" strokeWidth={1.7} />
                             Atención humana
                           </span>
+                        )}
+                        {needsPaymentReview && (
+                          <Badge
+                            variant="warning"
+                            className="gap-1 px-2 py-0.5 text-[11px]"
+                          >
+                            <CreditCard className="h-3 w-3" strokeWidth={1.7} />
+                            Pago
+                          </Badge>
                         )}
                       </span>
                     </span>

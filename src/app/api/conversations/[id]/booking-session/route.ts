@@ -4,6 +4,10 @@ import {
   DrizzleAiBookingSessionRepository,
   type AiBookingSession,
 } from "@/server/ai/booking-sessions";
+import {
+  createManualPaymentVerificationService,
+  serializeManualPaymentVerification,
+} from "@/server/payments/manual-verifications";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +19,15 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     organizationId: session.organizationId,
     conversationId: id,
   });
+  const paymentVerification = bookingSession?.manualPaymentVerificationId
+    ? await createManualPaymentVerificationService()
+        .get(session.organizationId, bookingSession.manualPaymentVerificationId)
+        .then(serializeManualPaymentVerification)
+        .catch(() => null)
+    : null;
   return Response.json({
     bookingSession: bookingSession ? serializeSession(bookingSession) : null,
+    paymentVerification,
   });
 });
 
