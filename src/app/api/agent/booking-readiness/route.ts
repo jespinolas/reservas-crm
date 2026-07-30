@@ -50,6 +50,7 @@ export const GET = withAuth(async (session) => {
       liveBookingAllowed: ready && settings.readinessStatus === "ready",
       mode: settings.mode,
       storedReadinessStatus: settings.readinessStatus,
+      readinessLastCheckedAt: settings.readinessLastCheckedAt?.toISOString() ?? null,
       checks,
       catalog: catalogReadiness,
       aiProvider,
