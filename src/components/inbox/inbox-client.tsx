@@ -38,6 +38,8 @@ export function InboxClient() {
   const [paymentVerifications, setPaymentVerifications] = useState<
     ManualPaymentVerificationDto[]
   >([]);
+  const [pendingPaymentReviewConversationIds, setPendingPaymentReviewConversationIds] =
+    useState<Set<string>>(new Set());
   const [panelOpen, setPanelOpen] = useState(true);
   // Se incrementa con cada evento SSE que puede cambiar la etapa/lead o el
   // estado del agente: el panel de detalles lo observa y refetch en vivo.
@@ -86,9 +88,27 @@ export function InboxClient() {
     }
   }, []);
 
+  const refetchPendingPaymentReviews = useCallback(async () => {
+    const res = await fetch(
+      "/api/payments/manual-verifications?status=needs_operator_review&limit=100"
+    ).catch(() => null);
+    if (!res?.ok) return;
+    const data = (await res.json()) as {
+      verifications: ManualPaymentVerificationDto[];
+    };
+    setPendingPaymentReviewConversationIds(
+      new Set(
+        data.verifications
+          .map((verification) => verification.conversationId)
+          .filter((conversationId): conversationId is string => Boolean(conversationId))
+      )
+    );
+  }, []);
+
   useEffect(() => {
     void refetchConversations();
-  }, [refetchConversations]);
+    void refetchPendingPaymentReviews();
+  }, [refetchConversations, refetchPendingPaymentReviews]);
 
   const select = useCallback(
     (id: string) => {
@@ -128,6 +148,7 @@ export function InboxClient() {
           body: JSON.stringify({ markRead: true }),
         });
         void refetchPaymentVerifications(conversationId);
+        void refetchPendingPaymentReviews();
       }
       void refetchConversations();
       // Un entrante nuevo puede crear/mover el lead: refresca el panel.
@@ -143,6 +164,7 @@ export function InboxClient() {
     },
     onConversationUpdated: () => {
       void refetchConversations();
+      void refetchPendingPaymentReviews();
       // El agente movió de etapa o cambió el handoff: refresca el panel en vivo.
       setDetailRev((v) => v + 1);
     },
@@ -151,6 +173,7 @@ export function InboxClient() {
       void refetchConversations();
       if (selectedIdRef.current) void refetchMessages(selectedIdRef.current);
       if (selectedIdRef.current) void refetchPaymentVerifications(selectedIdRef.current);
+      void refetchPendingPaymentReviews();
       setDetailRev((v) => v + 1);
     },
   });
@@ -217,11 +240,17 @@ export function InboxClient() {
         void refetchPaymentVerifications(selectedIdRef.current);
         void refetchMessages(selectedIdRef.current);
       }
+      void refetchPendingPaymentReviews();
       void refetchConversations();
       setDetailRev((v) => v + 1);
       return null;
     },
-    [refetchConversations, refetchMessages, refetchPaymentVerifications]
+    [
+      refetchConversations,
+      refetchMessages,
+      refetchPaymentVerifications,
+      refetchPendingPaymentReviews,
+    ]
   );
 
   return (
@@ -230,6 +259,7 @@ export function InboxClient() {
         <ConversationList
           conversations={conversations}
           selectedId={selectedId}
+          pendingPaymentConversationIds={pendingPaymentReviewConversationIds}
           onSelect={select}
           onSeeded={() => void refetchConversations()}
         />

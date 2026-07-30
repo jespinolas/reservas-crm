@@ -914,6 +914,76 @@ export const googleCalendarSync = pgTable(
   ]
 );
 
+export const resourceCalendarMapping = pgTable(
+  "resource_calendar_mapping",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => resource.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["google"] }).notNull(),
+    calendarIdRedacted: text("calendar_id_redacted").notNull(),
+    status: text("status", {
+      enum: ["connected", "sync_failed", "disabled"],
+    })
+      .notNull()
+      .default("connected"),
+    lastSyncedAt: timestamp("last_synced_at"),
+    lastErrorCode: text("last_error_code"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("resource_calendar_mapping_org_resource_provider_uq").on(
+      t.organizationId,
+      t.resourceId,
+      t.provider
+    ),
+    index("resource_calendar_mapping_org_status_idx").on(t.organizationId, t.status),
+  ]
+);
+
+export const resourceBusyBlock = pgTable(
+  "resource_busy_block",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => resource.id, { onDelete: "cascade" }),
+    source: text("source", { enum: ["google_calendar"] }).notNull(),
+    providerEventIdHash: text("provider_event_id_hash").notNull(),
+    startsAt: timestamp("starts_at").notNull(),
+    endsAt: timestamp("ends_at").notNull(),
+    status: text("status", { enum: ["active", "cancelled"] })
+      .notNull()
+      .default("active"),
+    summaryRedacted: text("summary_redacted"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("resource_busy_block_org_resource_source_event_uq").on(
+      t.organizationId,
+      t.resourceId,
+      t.source,
+      t.providerEventIdHash
+    ),
+    index("resource_busy_block_org_resource_time_idx").on(
+      t.organizationId,
+      t.resourceId,
+      t.startsAt,
+      t.endsAt
+    ),
+    index("resource_busy_block_org_status_idx").on(t.organizationId, t.status),
+  ]
+);
+
 export const automationOutbox = pgTable(
   "automation_outbox",
   {

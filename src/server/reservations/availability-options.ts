@@ -20,7 +20,7 @@ export type AvailabilityBlockingRange = {
   resourceId: string;
   startsAt: Date;
   endsAt: Date;
-  source: "hold" | "reservation";
+  source: "hold" | "reservation" | "calendar_busy_block";
 };
 
 export type AvailabilityOption = {

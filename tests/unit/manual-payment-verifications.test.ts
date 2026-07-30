@@ -219,6 +219,48 @@ describe("ManualPaymentVerificationService", () => {
     });
   });
 
+  it("keeps one active review request when duplicate inbound evidence arrives", async () => {
+    const { service, manualRepository, bookingService } = fixture();
+    const hold = await createHold({ bookingService, manualRepository });
+    manualRepository.paymentRules.set("org_1:rsvc_1", paymentRule());
+
+    const first = await service.recordInboundEvidence({
+      organizationId: "org_1",
+      conversationId: "cv_1",
+      contactId: "ct_1",
+      messageId: "msg_image_1",
+      messageType: "image",
+      evidenceMediaId: "wamid_media_1",
+      now,
+    });
+    const second = await service.recordInboundEvidence({
+      organizationId: "org_1",
+      conversationId: "cv_1",
+      contactId: "ct_1",
+      messageId: "msg_image_2",
+      messageType: "image",
+      evidenceMediaId: "wamid_media_2",
+      now,
+    });
+
+    expect(first?.bookingHoldId).toBe(hold.id);
+    expect(second).toMatchObject({
+      id: first?.id,
+      bookingHoldId: hold.id,
+      status: "needs_operator_review",
+      evidenceMessageId: "msg_image_2",
+      evidenceMediaId: "wamid_media_2",
+    });
+    expect(manualRepository.verifications.size).toBe(1);
+    await expect(
+      service.list({
+        organizationId: "org_1",
+        conversationId: "cv_1",
+        statuses: ["needs_operator_review"],
+      })
+    ).resolves.toHaveLength(1);
+  });
+
   it("ignores normal text and holds without required deposits", async () => {
     const { service, manualRepository, bookingService } = fixture();
     await createHold({ bookingService, manualRepository });

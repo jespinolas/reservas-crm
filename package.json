@@ -36,6 +36,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "lab:country-house": "mkdir -p .tmp && esbuild scripts/lab/country-house-booking.ts --bundle --platform=node --format=esm --outfile=.tmp/country-house-booking-lab.mjs --alias:@=./src --packages=external && node .tmp/country-house-booking-lab.mjs",
     "seed:demo": "esbuild scripts/seed/demo.ts --bundle --platform=node --format=esm --outfile=.tmp-seed-demo.mjs --alias:@=./src --packages=external && node .tmp-seed-demo.mjs"
   },
   "dependencies": {
