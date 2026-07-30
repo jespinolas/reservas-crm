@@ -777,6 +777,11 @@ function ManualPaymentVerificationsPanel({
         <QueueMetric label="Revisar pago" value={queue.summary.needsReview} />
         <QueueMetric label="Falta comprobante" value={queue.summary.waitingForEvidence} />
         <QueueMetric
+          label="Sin atender"
+          value={queue.summary.stale}
+          tone={queue.summary.stale > 0 ? "warning" : "neutral"}
+        />
+        <QueueMetric
           label="Urgentes/vencidos"
           value={queue.summary.urgent + queue.summary.expired}
           tone={queue.summary.urgent + queue.summary.expired > 0 ? "warning" : "neutral"}
@@ -815,7 +820,15 @@ function ManualPaymentVerificationsPanel({
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <Badge variant={workItem.level === "expired" ? "destructive" : "warning"}>
+                    <Badge
+                      variant={
+                        workItem.level === "expired"
+                          ? "destructive"
+                          : workItem.level === "waiting"
+                            ? "secondary"
+                            : "warning"
+                      }
+                    >
                       {workItem.label}
                     </Badge>
                     <Badge variant="secondary">{formatMoneyMinor(verification)}</Badge>
