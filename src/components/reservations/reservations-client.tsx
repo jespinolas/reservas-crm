@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, Clock3, Package, Plus, RefreshCw, Search } from "lucide-react";
 import type {
@@ -7,6 +8,7 @@ import type {
   ReservationListSummaryDto,
 } from "@/lib/types";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
+import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { formatPhone } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -793,6 +795,14 @@ function ManualPaymentVerificationsPanel({
             const resource = resources.find((item) => item.id === verification.resourceId);
             const service = services.find((item) => item.id === verification.serviceId);
             const canDecide = verification.status === "needs_operator_review";
+            const inboxAction =
+              verification.status === "waiting_for_evidence" ||
+              verification.status === "needs_operator_review"
+                ? buildBookingWorkQueueInboxAction({
+                    conversationId: verification.conversationId,
+                    status: verification.status,
+                  })
+                : null;
             return (
               <div key={verification.id} className="rounded-md border bg-card p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -834,11 +844,23 @@ function ManualPaymentVerificationsPanel({
                     >
                       No
                     </Button>
+                    {inboxAction && (
+                      <QueueLinkButton href={inboxAction.href} title={inboxAction.title}>
+                        {inboxAction.label}
+                      </QueueLinkButton>
+                    )}
                   </div>
                 ) : (
-                  <p className="mt-3 rounded-md bg-subtle px-2 py-1.5 text-xs text-text-3">
-                    Esperando comprobante del cliente.
-                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <p className="rounded-md bg-subtle px-2 py-1.5 text-xs text-text-3">
+                      Esperando comprobante del cliente.
+                    </p>
+                    {inboxAction && (
+                      <QueueLinkButton href={inboxAction.href} title={inboxAction.title}>
+                        {inboxAction.label}
+                      </QueueLinkButton>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -846,6 +868,26 @@ function ManualPaymentVerificationsPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function QueueLinkButton({
+  href,
+  title,
+  children,
+}: {
+  href: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      title={title}
+      className="inline-flex h-8 items-center justify-center rounded-md border border-input px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+    >
+      {children}
+    </Link>
   );
 }
 

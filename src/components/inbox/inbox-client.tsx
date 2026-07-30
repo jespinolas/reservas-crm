@@ -125,12 +125,18 @@ export function InboxClient() {
 
   // Enlace directo desde Contactos/Pipeline: /inbox?contact=<id>
   const searchParams = useSearchParams();
+  const conversationParam = searchParams.get("conversation");
   const contactParam = searchParams.get("contact");
   useEffect(() => {
-    if (!contactParam || selectedIdRef.current) return;
+    if (selectedIdRef.current) return;
+    if (conversationParam && conversations?.some((c) => c.id === conversationParam)) {
+      select(conversationParam);
+      return;
+    }
+    if (!contactParam) return;
     const match = conversations?.find((c) => c.contact.id === contactParam);
     if (match) select(match.id);
-  }, [contactParam, conversations, select]);
+  }, [conversationParam, contactParam, conversations, select]);
 
   useEvents({
     onMessageNew: ({ conversationId, message }) => {
