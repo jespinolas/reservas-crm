@@ -4,12 +4,13 @@ export type PendingBookingWorkVerification = {
   id: string;
   status: PendingBookingWorkStatus;
   expiresAt: string;
+  createdAt?: string;
 };
 
 export type PendingBookingWorkItem = {
   id: string;
   status: PendingBookingWorkStatus;
-  level: "expired" | "urgent" | "review" | "waiting";
+  level: "expired" | "urgent" | "review" | "stale" | "waiting";
   label: string;
   actionText: string;
   sortPriority: number;
@@ -22,16 +23,20 @@ export type PendingBookingWorkSummary = {
   waitingForEvidence: number;
   urgent: number;
   expired: number;
+  stale: number;
 };
 
 const URGENCY_WINDOW_MS = 5 * 60 * 1000;
+const DEFAULT_STALE_AFTER_MS = 30 * 60 * 1000;
 
 export function buildPendingBookingWorkQueue(
   verifications: PendingBookingWorkVerification[],
-  now = new Date()
+  now = new Date(),
+  options: { staleAfterMs?: number } = {}
 ): { items: PendingBookingWorkItem[]; summary: PendingBookingWorkSummary } {
+  const staleAfterMs = options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
   const items = verifications
-    .map((verification) => buildPendingBookingWorkItem(verification, now))
+    .map((verification) => buildPendingBookingWorkItem(verification, now, staleAfterMs))
     .filter((item): item is PendingBookingWorkItem => Boolean(item))
     .sort((a, b) => b.sortPriority - a.sortPriority || a.expiresAt.localeCompare(b.expiresAt));
 
@@ -43,19 +48,26 @@ export function buildPendingBookingWorkQueue(
       waitingForEvidence: items.filter((item) => item.status === "waiting_for_evidence").length,
       urgent: items.filter((item) => item.level === "urgent").length,
       expired: items.filter((item) => item.level === "expired").length,
+      stale: items.filter((item) => item.level === "stale").length,
     },
   };
 }
 
 function buildPendingBookingWorkItem(
   verification: PendingBookingWorkVerification,
-  now: Date
+  now: Date,
+  staleAfterMs: number
 ): PendingBookingWorkItem | null {
   const expiresAt = new Date(verification.expiresAt);
   if (Number.isNaN(expiresAt.getTime())) return null;
   const remainingMs = expiresAt.getTime() - now.getTime();
   const expired = remainingMs <= 0;
   const urgent = !expired && remainingMs <= URGENCY_WINDOW_MS;
+  const createdAt = verification.createdAt ? new Date(verification.createdAt) : null;
+  const stale =
+    Boolean(createdAt) &&
+    !Number.isNaN(createdAt?.getTime()) &&
+    now.getTime() - (createdAt?.getTime() ?? now.getTime()) >= staleAfterMs;
 
   if (expired) {
     return {
@@ -92,6 +104,18 @@ function buildPendingBookingWorkItem(
       label: "Revisar pago",
       actionText: "Confirmá solo si el negocio recibió la seña.",
       sortPriority: 80,
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  if (stale) {
+    return {
+      id: verification.id,
+      status: verification.status,
+      level: "stale",
+      label: "Sin atender",
+      actionText: "Este pendiente lleva demasiado tiempo esperando respuesta.",
+      sortPriority: 70,
       expiresAt: expiresAt.toISOString(),
     };
   }
