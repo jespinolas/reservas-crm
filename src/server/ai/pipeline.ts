@@ -331,10 +331,16 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
       if (result.ok && result.tool === "reservation.create_hold_from_option") {
         await deliverReplyAndMark(
           conversation,
-          [
-            `Te guardé temporalmente esa opción hasta ${formatChatDateTime(result.hold.expiresAt)}.`,
-            "Si corresponde seña, enviá el comprobante por acá para que el negocio confirme el pago.",
-          ].join(" "),
+          result.paymentVerification
+            ? [
+                `Te guardé temporalmente esa opción hasta ${formatChatDateTime(result.hold.expiresAt)}.`,
+                `Para confirmar, enviá el comprobante de la seña de ${formatMoney(
+                  result.paymentVerification.expectedAmountMinor,
+                  result.paymentVerification.currency
+                )} por acá.`,
+                "El negocio revisa el pago y recién ahí confirma la reserva.",
+              ].join(" ")
+            : `Te guardé temporalmente esa opción hasta ${formatChatDateTime(result.hold.expiresAt)}. Te confirma una persona del equipo.`,
           attempt,
           startedAt
         );
@@ -472,6 +478,14 @@ function formatChatDateTime(value: string): string {
     timeStyle: "short",
     timeZone: "America/Asuncion",
   }).format(new Date(value));
+}
+
+function formatMoney(amountMinor: number, currency: string): string {
+  return new Intl.NumberFormat("es-PY", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "PYG" ? 0 : 2,
+  }).format(amountMinor);
 }
 
 async function moveLeadToStage(
