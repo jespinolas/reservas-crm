@@ -10,6 +10,7 @@ import type {
 import { buildBookingAutomationReadinessSummary } from "@/lib/booking-automation-readiness";
 import { buildCalendarMappingCoverage } from "@/lib/calendar-mapping-coverage";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
+import { buildBookingReadinessAcknowledgementActions } from "@/lib/booking-readiness-acknowledgement";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -130,6 +131,7 @@ type AiBookingReadiness = {
   ready: boolean;
   liveBookingAllowed: boolean;
   mode: "disabled" | "suggest_only" | "auto_hold" | "manual_payment_confirm";
+  storedReadinessStatus: "unknown" | "ready" | "not_ready";
   checks: Array<{ key: string; ok: boolean; message: string }>;
 };
 
@@ -398,6 +400,9 @@ function BookingAutomationReadinessCard({
     Map<string, ResourceCalendarMappingDto | null>
   >(new Map());
   const [message, setMessage] = useState<string | null>(null);
+  const [savingReadiness, setSavingReadiness] = useState<
+    "ready" | "not_ready" | null
+  >(null);
 
   const refetch = useCallback(async () => {
     const activeServices = services.filter((service) => service.active);
@@ -478,6 +483,30 @@ function BookingAutomationReadinessCard({
       }),
     [readiness, queue.summary, services, paymentRulesByServiceId, resources, calendarMappingsByResourceId]
   );
+  const acknowledgement = buildBookingReadinessAcknowledgementActions({
+    summaryStatus: summary.status,
+    storedReadinessStatus: readiness?.storedReadinessStatus ?? "unknown",
+  });
+
+  async function saveReadiness(status: "ready" | "not_ready") {
+    if (!readiness) return;
+    setSavingReadiness(status);
+    setMessage(null);
+    const response = await fetch("/api/agent/booking-settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: readiness.mode,
+        readinessStatus: status,
+      }),
+    }).catch(() => null);
+    setSavingReadiness(null);
+    if (!response?.ok) {
+      setMessage("No se pudo guardar la revisión de auto-reservas.");
+      return;
+    }
+    await refetch();
+  }
 
   return (
     <section className="border-b px-6 py-5">
@@ -508,6 +537,30 @@ function BookingAutomationReadinessCard({
           <Button size="sm" variant="secondary" onClick={() => void refetch()}>
             Actualizar
           </Button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+          <div>
+            <p className="text-xs font-semibold">Revisión admin: {acknowledgement.statusLabel}</p>
+            <p className="mt-1 text-xs text-text-3">{acknowledgement.explanation}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={!acknowledgement.canMarkReady || Boolean(savingReadiness)}
+              onClick={() => void saveReadiness("ready")}
+            >
+              {savingReadiness === "ready" ? "Guardando…" : "Marcar lista"}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!acknowledgement.canMarkNotReady || Boolean(savingReadiness)}
+              onClick={() => void saveReadiness("not_ready")}
+            >
+              {savingReadiness === "not_ready" ? "Guardando…" : "Marcar no lista"}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
