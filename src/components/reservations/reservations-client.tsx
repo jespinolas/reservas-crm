@@ -12,6 +12,7 @@ import { buildCalendarMappingCoverage } from "@/lib/calendar-mapping-coverage";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { buildBookingReadinessAcknowledgementActions } from "@/lib/booking-readiness-acknowledgement";
 import { buildBookingReadinessHistorySummary } from "@/lib/booking-readiness-history";
+import { buildBookingDemoScript } from "@/lib/booking-demo-script";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -492,6 +493,9 @@ function BookingAutomationReadinessCard({
   const history = buildBookingReadinessHistorySummary({
     readinessLastCheckedAt: readiness?.readinessLastCheckedAt ?? null,
   });
+  const demoScript = buildBookingDemoScript({
+    demoStatus: summary.demoChecklist.status,
+  });
 
   async function saveReadiness(status: "ready" | "not_ready") {
     if (!readiness) return;
@@ -647,6 +651,42 @@ function BookingAutomationReadinessCard({
                 <p className="mt-1 text-xs leading-relaxed text-text-3">{item.message}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-md border bg-background p-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold">Guion de demo</p>
+              <p className="mt-1 max-w-2xl text-xs text-text-3">{demoScript.framing}</p>
+            </div>
+            <Badge
+              variant={
+                summary.demoChecklist.status === "ready"
+                  ? "success"
+                  : summary.demoChecklist.status === "blocked"
+                    ? "destructive"
+                    : "warning"
+              }
+            >
+              {demoScript.badge}
+            </Badge>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            <div className="rounded-md border bg-subtle p-2">
+              <p className="text-xs font-medium">Cliente pregunta</p>
+              <p className="mt-1 text-xs leading-relaxed text-text-3">{demoScript.customerPrompt}</p>
+            </div>
+            <div className="rounded-md border bg-subtle p-2">
+              <p className="text-xs font-medium">Respuesta esperada</p>
+              <p className="mt-1 text-xs leading-relaxed text-text-3">
+                {demoScript.expectedAssistantReply}
+              </p>
+            </div>
+            <div className="rounded-md border bg-subtle p-2">
+              <p className="text-xs font-medium">Nota para operador</p>
+              <p className="mt-1 text-xs leading-relaxed text-text-3">{demoScript.operatorNote}</p>
+            </div>
           </div>
         </div>
 
