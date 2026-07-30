@@ -15,6 +15,7 @@ import { buildBookingReadinessHistorySummary } from "@/lib/booking-readiness-his
 import { buildBookingDemoScript } from "@/lib/booking-demo-script";
 import { buildBookingValueSummary } from "@/lib/booking-value-summary";
 import { buildBookingReadinessExportCopy } from "@/lib/booking-readiness-export-copy";
+import { buildBookingReadinessPrintSummary } from "@/lib/booking-readiness-print-summary";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -505,6 +506,11 @@ function BookingAutomationReadinessCard({
     readiness: summary,
     valueSummary,
   });
+  const printSummary = buildBookingReadinessPrintSummary({
+    readinessStatus: summary.status,
+    demoTitle: summary.demoChecklist.title,
+    valueSummary,
+  });
 
   async function saveReadiness(status: "ready" | "not_ready") {
     if (!readiness) return;
@@ -742,6 +748,39 @@ function BookingAutomationReadinessCard({
             value={exportCopy}
             className="mt-3 min-h-40 w-full resize-y rounded-md border bg-subtle p-3 font-mono text-xs leading-relaxed text-foreground"
           />
+        </div>
+
+        <div className="mt-3 rounded-lg border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-3">
+                Resumen para imprimir o screenshot
+              </p>
+              <h4 className="mt-2 text-base font-semibold">{printSummary.headline}</h4>
+              <p className="mt-1 text-xs text-text-3">{printSummary.statusLine}</p>
+            </div>
+            <Badge
+              variant={
+                summary.status === "ready"
+                  ? "success"
+                  : summary.status === "blocked"
+                    ? "destructive"
+                    : "warning"
+              }
+            >
+              {printSummary.badge}
+            </Badge>
+          </div>
+          <ul className="mt-4 grid gap-2 text-xs text-text-3 md:grid-cols-2">
+            {printSummary.benefits.map((benefit) => (
+              <li key={benefit} className="rounded-md border bg-background p-2">
+                {benefit}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 rounded-md bg-subtle p-2 text-xs text-text-3">
+            {printSummary.authorityNote}
+          </p>
         </div>
 
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
