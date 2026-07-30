@@ -8,6 +8,7 @@ import type {
   ReservationListSummaryDto,
 } from "@/lib/types";
 import { buildBookingAutomationReadinessSummary } from "@/lib/booking-automation-readiness";
+import { buildCalendarMappingCoverage } from "@/lib/calendar-mapping-coverage";
 import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
@@ -323,7 +324,7 @@ export function ReservationsClient() {
         <SummaryTile label="Canceladas" value={summary.cancelled} />
       </section>
 
-      <BookingAutomationReadinessCard services={services} />
+      <BookingAutomationReadinessCard services={services} resources={resources} />
 
       <CatalogPanel
         resources={resources}
@@ -381,16 +382,26 @@ export function ReservationsClient() {
   );
 }
 
-function BookingAutomationReadinessCard({ services }: { services: CatalogService[] }) {
+function BookingAutomationReadinessCard({
+  services,
+  resources,
+}: {
+  services: CatalogService[];
+  resources: CatalogResource[];
+}) {
   const [readiness, setReadiness] = useState<AiBookingReadiness | null>(null);
   const [pendingVerifications, setPendingVerifications] = useState<ManualPaymentVerification[]>([]);
   const [paymentRulesByServiceId, setPaymentRulesByServiceId] = useState<
     Map<string, ServicePaymentRule | null>
   >(new Map());
+  const [calendarMappingsByResourceId, setCalendarMappingsByResourceId] = useState<
+    Map<string, ResourceCalendarMappingDto | null>
+  >(new Map());
   const [message, setMessage] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     const activeServices = services.filter((service) => service.active);
+    const activeResources = resources.filter((resource) => resource.active);
     const [readinessRes, pendingRes] = await Promise.all([
       fetch("/api/agent/booking-readiness").catch(() => null),
       fetch(
@@ -415,11 +426,22 @@ function BookingAutomationReadinessCard({ services }: { services: CatalogService
         return [service.id, data.paymentRule] as const;
       })
     );
+    const mappingResults = await Promise.all(
+      activeResources.map(async (resource) => {
+        const response = await fetch(
+          `/api/reservations/resources/${resource.id}/calendar-mapping`
+        ).catch(() => null);
+        if (!response?.ok) return [resource.id, null] as const;
+        const data = (await response.json()) as { mapping: ResourceCalendarMappingDto | null };
+        return [resource.id, data.mapping] as const;
+      })
+    );
     setReadiness(readinessData.readiness);
     setPendingVerifications(pendingData.verifications);
     setPaymentRulesByServiceId(new Map(ruleResults));
+    setCalendarMappingsByResourceId(new Map(mappingResults));
     setMessage(null);
-  }, [services]);
+  }, [resources, services]);
 
   useEffect(() => {
     void refetch();
@@ -449,8 +471,12 @@ function BookingAutomationReadinessCard({ services }: { services: CatalogService
           services,
           rulesByServiceId: paymentRulesByServiceId,
         }),
+        calendarMappings: buildCalendarMappingCoverage({
+          resources,
+          mappingsByResourceId: calendarMappingsByResourceId,
+        }),
       }),
-    [readiness, queue.summary, services, paymentRulesByServiceId]
+    [readiness, queue.summary, services, paymentRulesByServiceId, resources, calendarMappingsByResourceId]
   );
 
   return (

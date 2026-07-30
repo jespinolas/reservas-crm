@@ -23,6 +23,13 @@ describe("buildBookingAutomationReadinessSummary", () => {
         missingServiceNames: [],
         ready: true,
       },
+      calendarMappings: {
+        totalActiveResources: 1,
+        connectedResources: 1,
+        missingResourceNames: [],
+        unhealthyResourceNames: [],
+        ready: true,
+      },
     });
 
     expect(summary).toMatchObject({
@@ -33,6 +40,9 @@ describe("buildBookingAutomationReadinessSummary", () => {
       status: "ok",
     });
     expect(summary.checks.find((check) => check.key === "payment_rules")).toMatchObject({
+      status: "ok",
+    });
+    expect(summary.checks.find((check) => check.key === "calendar_mapping")).toMatchObject({
       status: "ok",
     });
   });
@@ -51,6 +61,7 @@ describe("buildBookingAutomationReadinessSummary", () => {
       },
       pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
       paymentRules: null,
+      calendarMappings: null,
     });
 
     expect(summary.status).toBe("blocked");
@@ -65,6 +76,13 @@ describe("buildBookingAutomationReadinessSummary", () => {
         totalActiveServices: 1,
         configuredServices: 1,
         missingServiceNames: [],
+        ready: true,
+      },
+      calendarMappings: {
+        totalActiveResources: 1,
+        connectedResources: 1,
+        missingResourceNames: [],
+        unhealthyResourceNames: [],
         ready: true,
       },
     });
@@ -89,12 +107,45 @@ describe("buildBookingAutomationReadinessSummary", () => {
         missingServiceNames: ["Spa"],
         ready: false,
       },
+      calendarMappings: {
+        totalActiveResources: 1,
+        connectedResources: 1,
+        missingResourceNames: [],
+        unhealthyResourceNames: [],
+        ready: true,
+      },
     });
 
     expect(summary.status).toBe("warning");
     expect(summary.checks.find((check) => check.key === "payment_rules")).toMatchObject({
       status: "warning",
       message: "Faltan reglas en 1 servicio(s): Spa",
+    });
+  });
+
+  it("warns when calendar mapping coverage is incomplete", () => {
+    const summary = buildBookingAutomationReadinessSummary({
+      aiBooking: readyAiBooking,
+      pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
+      paymentRules: {
+        totalActiveServices: 1,
+        configuredServices: 1,
+        missingServiceNames: [],
+        ready: true,
+      },
+      calendarMappings: {
+        totalActiveResources: 2,
+        connectedResources: 1,
+        missingResourceNames: ["Casa 2"],
+        unhealthyResourceNames: ["Casa 3"],
+        ready: false,
+      },
+    });
+
+    expect(summary.status).toBe("warning");
+    expect(summary.checks.find((check) => check.key === "calendar_mapping")).toMatchObject({
+      status: "warning",
+      message: "Faltan 1 mapping(s) y 1 tienen problemas: Casa 2, Casa 3",
     });
   });
 });
