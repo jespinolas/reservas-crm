@@ -14,6 +14,7 @@ import { buildBookingReadinessAcknowledgementActions } from "@/lib/booking-readi
 import { buildBookingReadinessHistorySummary } from "@/lib/booking-readiness-history";
 import { buildBookingDemoScript } from "@/lib/booking-demo-script";
 import { buildBookingValueSummary } from "@/lib/booking-value-summary";
+import { buildBookingReadinessExportCopy } from "@/lib/booking-readiness-export-copy";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -500,6 +501,10 @@ function BookingAutomationReadinessCard({
   const valueSummary = buildBookingValueSummary({
     readinessStatus: summary.status,
   });
+  const exportCopy = buildBookingReadinessExportCopy({
+    readiness: summary,
+    valueSummary,
+  });
 
   async function saveReadiness(status: "ready" | "not_ready") {
     if (!readiness) return;
@@ -725,6 +730,18 @@ function BookingAutomationReadinessCard({
             ))}
           </ul>
           <p className="mt-2 text-xs text-text-3">{valueSummary.caution}</p>
+        </div>
+
+        <div className="mt-3 rounded-md border bg-background p-3">
+          <p className="text-xs font-semibold">Resumen seguro para copiar</p>
+          <p className="mt-1 max-w-2xl text-xs text-text-3">
+            Texto sin IDs, teléfonos, calendarios ni referencias de pago para usar en handoffs o notas de venta.
+          </p>
+          <textarea
+            readOnly
+            value={exportCopy}
+            className="mt-3 min-h-40 w-full resize-y rounded-md border bg-subtle p-3 font-mono text-xs leading-relaxed text-foreground"
+          />
         </div>
 
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
