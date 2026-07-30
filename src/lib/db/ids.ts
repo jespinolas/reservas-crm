@@ -34,6 +34,8 @@ const prefixes = {
   aiBookingSessionEvent: "aibevt",
   googleCalendarConnection: "gcal",
   googleCalendarSync: "gcalsync",
+  resourceCalendarMapping: "rcm",
+  resourceBusyBlock: "rbb",
   automationOutbox: "aout",
   aiReplyAttempt: "aira",
 } as const;

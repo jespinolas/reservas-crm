@@ -85,6 +85,13 @@
       "when": 1785328800000,
       "tag": "0011_ai_booking_session",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785415200000,
+      "tag": "0012_resource_calendar_busy_blocks",
+      "breakpoints": true
     }
   ]
 }

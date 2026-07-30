@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock3, Package, Plus, Search } from "lucide-react";
+import { CalendarDays, Clock3, Package, Plus, RefreshCw, Search } from "lucide-react";
 import type {
   ReservationListItemDto,
   ReservationListSummaryDto,
@@ -118,6 +118,30 @@ type ManualPaymentVerification = {
   customerReferenceRedacted: string | null;
   expiresAt: string;
   createdAt: string;
+};
+
+type ResourceCalendarMappingDto = {
+  id: string;
+  resourceId: string;
+  provider: "google";
+  calendarIdRedacted: string;
+  status: "connected" | "sync_failed" | "disabled";
+  lastSyncedAt: string | null;
+  lastErrorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ResourceBusyBlockDto = {
+  id: string;
+  resourceId: string;
+  source: "google_calendar";
+  startsAt: string;
+  endsAt: string;
+  status: "active" | "cancelled";
+  summaryRedacted: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 const FILTERS: { value: StatusFilter; label: string }[] = [
@@ -1096,6 +1120,64 @@ function ResourceEditor({
   onSave: () => void;
   onToggle: () => void;
 }) {
+  const [calendarId, setCalendarId] = useState("");
+  const [mapping, setMapping] = useState<ResourceCalendarMappingDto | null>(null);
+  const [busyBlocks, setBusyBlocks] = useState<ResourceBusyBlockDto[]>([]);
+  const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+
+  const loadCalendarState = useCallback(async () => {
+    setCalendarLoading(true);
+    const [mappingResponse, blocksResponse] = await Promise.all([
+      fetch(`/api/reservations/resources/${resource.id}/calendar-mapping`).catch(() => null),
+      fetch(`/api/reservations/resources/${resource.id}/busy-blocks?status=active`).catch(
+        () => null
+      ),
+    ]);
+    setCalendarLoading(false);
+    if (mappingResponse?.ok) {
+      const data = (await mappingResponse.json()) as {
+        mapping: ResourceCalendarMappingDto | null;
+      };
+      setMapping(data.mapping);
+      setCalendarId("");
+    }
+    if (blocksResponse?.ok) {
+      const data = (await blocksResponse.json()) as { busyBlocks: ResourceBusyBlockDto[] };
+      setBusyBlocks(data.busyBlocks.slice(0, 5));
+    }
+  }, [resource.id]);
+
+  useEffect(() => {
+    void loadCalendarState();
+  }, [loadCalendarState]);
+
+  async function saveCalendarMapping(status: "connected" | "disabled" = "connected") {
+    const value = calendarId.trim();
+    if (status === "connected" && !value) {
+      setCalendarMessage("Agrega el ID del calendario para este item.");
+      return;
+    }
+    const response = await fetch(`/api/reservations/resources/${resource.id}/calendar-mapping`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...(value ? { calendarId: value } : {}),
+        status,
+      }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setCalendarMessage("No se pudo guardar el calendario.");
+      return;
+    }
+    const data = (await response.json()) as { mapping: ResourceCalendarMappingDto };
+    setMapping(data.mapping);
+    setCalendarId("");
+    setCalendarMessage(
+      status === "disabled" ? "Calendario desactivado." : "Calendario conectado al item."
+    );
+  }
+
   return (
     <div className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_150px_88px_auto_auto] md:items-center">
       <Input
@@ -1132,8 +1214,86 @@ function ResourceEditor({
         onChange={(e) => onChange({ ...resource, description: e.target.value })}
         className="md:col-span-5"
       />
+      <div className="rounded-md border bg-subtle p-3 md:col-span-5">
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-medium">Google Calendar del item</p>
+            <p className="mt-0.5 text-xs text-text-3">
+              Bloqueos importados afectan disponibilidad; el CRM sigue decidiendo reservas.
+            </p>
+          </div>
+          <MappingBadge mapping={mapping} />
+        </div>
+        <div className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto] md:items-center">
+          <Input
+            placeholder="primary o calendario@empresa.com"
+            value={calendarId}
+            onChange={(e) => setCalendarId(e.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void saveCalendarMapping("connected")}
+          >
+            Guardar calendario
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void saveCalendarMapping("disabled")}
+            disabled={!mapping}
+          >
+            Desactivar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void loadCalendarState()}
+            disabled={calendarLoading}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Ver bloqueos
+          </Button>
+        </div>
+        {mapping && (
+          <p className="mt-2 text-xs text-text-3">
+            Calendario: {mapping.calendarIdRedacted}
+            {mapping.lastSyncedAt ? ` · última sync ${formatDateTime(mapping.lastSyncedAt)}` : ""}
+            {mapping.lastErrorCode ? ` · error ${mapping.lastErrorCode}` : ""}
+          </p>
+        )}
+        {calendarMessage && <p className="mt-2 text-xs text-text-3">{calendarMessage}</p>}
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {busyBlocks.map((block) => (
+            <div key={block.id} className="rounded-md border bg-card px-3 py-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{formatDateTime(block.startsAt)}</span>
+                <Badge variant={block.status === "active" ? "secondary" : "warning"}>
+                  {block.status === "active" ? "Bloqueado" : "Cancelado"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-text-3">hasta {formatDateTime(block.endsAt)}</p>
+              {block.summaryRedacted && (
+                <p className="mt-1 truncate text-text-3">{block.summaryRedacted}</p>
+              )}
+            </div>
+          ))}
+          {busyBlocks.length === 0 && (
+            <p className="rounded-md border border-dashed bg-card py-4 text-center text-xs text-text-3 md:col-span-2">
+              Sin bloqueos importados activos todavía.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
+}
+
+function MappingBadge({ mapping }: { mapping: ResourceCalendarMappingDto | null }) {
+  if (!mapping) return <Badge variant="secondary">Sin calendario</Badge>;
+  if (mapping.status === "connected") return <Badge variant="success">Conectado</Badge>;
+  if (mapping.status === "sync_failed") return <Badge variant="warning">Sync falló</Badge>;
+  return <Badge variant="secondary">Desactivado</Badge>;
 }
 
 function ServiceEditor({
