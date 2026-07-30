@@ -1,5 +1,10 @@
 export type BookingReplyDraftAction = {
-  id: "confirmed" | "payment_review" | "payment_rejected" | "human_handoff";
+  id:
+    | "confirmed"
+    | "payment_evidence_request"
+    | "payment_review"
+    | "payment_rejected"
+    | "human_handoff";
   label: string;
   text: string;
 };
@@ -58,8 +63,20 @@ export function buildBookingReplyDraftActions(input: {
 
   if (
     input.paymentVerification?.status === "waiting_for_evidence" ||
+    session.status === "awaiting_payment_evidence"
+  ) {
+    actions.push({
+      id: "payment_evidence_request",
+      label: "Pedir comprobante",
+      text: [
+        "Para seguir con la reserva, por favor enviá el comprobante de la seña por acá.",
+        "La reserva todavía no queda confirmada hasta que el negocio valide el pago.",
+      ].join(" "),
+    });
+  }
+
+  if (
     input.paymentVerification?.status === "needs_operator_review" ||
-    session.status === "awaiting_payment_evidence" ||
     session.status === "awaiting_operator_payment_review"
   ) {
     actions.push({
