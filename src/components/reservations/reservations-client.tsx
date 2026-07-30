@@ -13,6 +13,7 @@ import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { buildBookingReadinessAcknowledgementActions } from "@/lib/booking-readiness-acknowledgement";
 import { buildBookingReadinessHistorySummary } from "@/lib/booking-readiness-history";
 import { buildBookingDemoScript } from "@/lib/booking-demo-script";
+import { buildBookingValueSummary } from "@/lib/booking-value-summary";
 import { buildBookingWorkQueueInboxAction } from "@/lib/booking-work-queue-link";
 import { buildPaymentRuleCoverage } from "@/lib/payment-rule-coverage";
 import { formatPhone } from "@/lib/utils";
@@ -496,6 +497,9 @@ function BookingAutomationReadinessCard({
   const demoScript = buildBookingDemoScript({
     demoStatus: summary.demoChecklist.status,
   });
+  const valueSummary = buildBookingValueSummary({
+    readinessStatus: summary.status,
+  });
 
   async function saveReadiness(status: "ready" | "not_ready") {
     if (!readiness) return;
@@ -688,6 +692,39 @@ function BookingAutomationReadinessCard({
               <p className="mt-1 text-xs leading-relaxed text-text-3">{demoScript.operatorNote}</p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-3 rounded-md border bg-subtle p-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold">Resumen para vender</p>
+              <h4 className="mt-1 text-sm font-semibold">{valueSummary.headline}</h4>
+              <p className="mt-1 max-w-3xl text-xs text-text-3">{valueSummary.subheadline}</p>
+            </div>
+            <Badge
+              variant={
+                summary.status === "ready"
+                  ? "success"
+                  : summary.status === "blocked"
+                    ? "destructive"
+                    : "warning"
+              }
+            >
+              {summary.status === "ready"
+                ? "Vendible"
+                : summary.status === "blocked"
+                  ? "Setup primero"
+                  : "Con cuidado"}
+            </Badge>
+          </div>
+          <ul className="mt-3 grid gap-2 text-xs text-text-3 md:grid-cols-2">
+            {valueSummary.benefits.map((benefit) => (
+              <li key={benefit} className="rounded-md border bg-background p-2">
+                {benefit}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-text-3">{valueSummary.caution}</p>
         </div>
 
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
