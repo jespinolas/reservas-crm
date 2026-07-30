@@ -6,6 +6,7 @@ import type {
   ReservationListItemDto,
   ReservationListSummaryDto,
 } from "@/lib/types";
+import { buildPendingBookingWorkQueue } from "@/lib/pending-booking-work-queue";
 import { formatPhone } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -699,6 +700,21 @@ function ManualPaymentVerificationsPanel({
 }) {
   const [verifications, setVerifications] = useState<ManualPaymentVerification[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const queue = useMemo(
+    () =>
+      buildPendingBookingWorkQueue(
+        verifications.filter(
+          (
+            verification
+          ): verification is ManualPaymentVerification & {
+            status: "waiting_for_evidence" | "needs_operator_review";
+          } =>
+            verification.status === "waiting_for_evidence" ||
+            verification.status === "needs_operator_review"
+        )
+      ),
+    [verifications]
+  );
 
   const loadVerifications = useCallback(async () => {
     const response = await fetch(
@@ -744,26 +760,39 @@ function ManualPaymentVerificationsPanel({
     <section className="border-b bg-subtle px-6 py-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">Pagos por confirmar</h3>
+          <h3 className="text-sm font-semibold">Trabajo pendiente de reservas</h3>
           <p className="mt-1 max-w-2xl text-xs text-text-3">
-            Cuando un cliente envía comprobante, el negocio confirma manualmente si recibió
-            la seña. Solo el botón Sí puede convertir el hold en reserva.
+            Prioriza pagos por revisar, comprobantes faltantes y holds que están por vencer.
+            Solo el botón Sí puede convertir un hold en reserva.
           </p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => void loadVerifications()}>
           Actualizar
         </Button>
       </div>
+      <div className="mb-4 grid gap-2 md:grid-cols-4">
+        <QueueMetric label="Total pendiente" value={queue.summary.total} />
+        <QueueMetric label="Revisar pago" value={queue.summary.needsReview} />
+        <QueueMetric label="Falta comprobante" value={queue.summary.waitingForEvidence} />
+        <QueueMetric
+          label="Urgentes/vencidos"
+          value={queue.summary.urgent + queue.summary.expired}
+          tone={queue.summary.urgent + queue.summary.expired > 0 ? "warning" : "neutral"}
+        />
+      </div>
       {message && <p className="mb-3 text-xs text-text-3">{message}</p>}
-      {verifications.length === 0 ? (
+      {queue.items.length === 0 ? (
         <p className="rounded-md border border-dashed bg-card py-6 text-center text-xs text-text-3">
-          Sin pagos pendientes.
+          Sin trabajo pendiente de reservas.
         </p>
       ) : (
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {verifications.map((verification) => {
+          {queue.items.map((workItem) => {
+            const verification = verifications.find((item) => item.id === workItem.id);
+            if (!verification) return null;
             const resource = resources.find((item) => item.id === verification.resourceId);
             const service = services.find((item) => item.id === verification.serviceId);
+            const canDecide = verification.status === "needs_operator_review";
             return (
               <div key={verification.id} className="rounded-md border bg-card p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -775,10 +804,15 @@ function ManualPaymentVerificationsPanel({
                       {service?.name ?? verification.serviceId}
                     </p>
                   </div>
-                  <Badge variant="warning">{formatMoneyMinor(verification)}</Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge variant={workItem.level === "expired" ? "destructive" : "warning"}>
+                      {workItem.label}
+                    </Badge>
+                    <Badge variant="secondary">{formatMoneyMinor(verification)}</Badge>
+                  </div>
                 </div>
                 <p className="mt-2 text-xs text-text-3">
-                  Pregunta: ¿recibiste esta seña para este cliente?
+                  {workItem.actionText}
                 </p>
                 {verification.customerReferenceRedacted && (
                   <p className="mt-1 truncate text-xs text-text-3">
@@ -788,24 +822,53 @@ function ManualPaymentVerificationsPanel({
                 <p className="mt-1 text-xs text-text-3">
                   Expira: {formatDateTime(verification.expiresAt)}
                 </p>
-                <div className="mt-3 flex gap-2">
-                  <Button size="sm" onClick={() => void decide(verification.id, "approve")}>
-                    Sí, recibido
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void decide(verification.id, "reject")}
-                  >
-                    No
-                  </Button>
-                </div>
+                {canDecide ? (
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" onClick={() => void decide(verification.id, "approve")}>
+                      Sí, recibido
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void decide(verification.id, "reject")}
+                    >
+                      No
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-md bg-subtle px-2 py-1.5 text-xs text-text-3">
+                    Esperando comprobante del cliente.
+                  </p>
+                )}
               </div>
             );
           })}
         </div>
       )}
     </section>
+  );
+}
+
+function QueueMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number;
+  tone?: "neutral" | "warning";
+}) {
+  return (
+    <div
+      className={
+        tone === "warning"
+          ? "rounded-md border border-[#ece2cf] bg-[#faf7f0] p-3"
+          : "rounded-md border bg-card p-3"
+      }
+    >
+      <p className="text-[11px] uppercase tracking-wide text-text-3">{label}</p>
+      <p className="mt-1 text-xl font-semibold">{value}</p>
+    </div>
   );
 }
 
