@@ -88,6 +88,16 @@ type ManualPaymentVerificationDto = {
 type BookingPanelState = {
   bookingSession: BookingSessionDto | null;
   paymentVerification: ManualPaymentVerificationDto | null;
+  timeline: BookingTimelineItemDto[];
+};
+
+type BookingTimelineItemDto = {
+  id: string;
+  eventType: string;
+  label: string;
+  actorLabel: string;
+  metadataSummary: string | null;
+  createdAt: string;
 };
 
 const HANDOFF_LABELS: Record<string, string> = {
@@ -745,6 +755,33 @@ function BookingOperatorPanel({
                   Ventana cerrada: usa una plantilla aprobada para retomar.
                 </p>
               )}
+            </div>
+          )}
+
+          {state?.timeline && state.timeline.length > 0 && (
+            <div className="rounded-md border bg-background p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-3">
+                Historial
+              </p>
+              <ol className="mt-3 space-y-3">
+                {state.timeline.map((item) => (
+                  <li key={item.id} className="grid grid-cols-[10px_1fr] gap-2">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-brand" />
+                    <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium text-foreground">{item.label}</p>
+                        <span className="shrink-0 text-[10px] text-text-3">
+                          {formatMaybeDateTime(item.createdAt)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-text-3">
+                        {item.actorLabel}
+                        {item.metadataSummary ? ` · ${item.metadataSummary}` : ""}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
           )}
         </div>

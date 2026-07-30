@@ -1,4 +1,5 @@
 import { apiError, withAuth } from "@/lib/api";
+import { serializeAiBookingTimeline } from "@/server/ai/booking-timeline";
 import {
   AiBookingSessionService,
   DrizzleAiBookingSessionRepository,
@@ -19,6 +20,9 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     organizationId: session.organizationId,
     conversationId: id,
   });
+  const timeline = bookingSession
+    ? serializeAiBookingTimeline(await createService().listEvents(bookingSession.id))
+    : [];
   const paymentVerification = bookingSession?.manualPaymentVerificationId
     ? await createManualPaymentVerificationService()
         .get(session.organizationId, bookingSession.manualPaymentVerificationId)
@@ -28,6 +32,7 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
   return Response.json({
     bookingSession: bookingSession ? serializeSession(bookingSession) : null,
     paymentVerification,
+    timeline,
   });
 });
 
