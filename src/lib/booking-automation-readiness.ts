@@ -17,6 +17,13 @@ export type BookingAutomationReadinessInput = {
     missingServiceNames: string[];
     ready: boolean;
   } | null;
+  calendarMappings?: {
+    totalActiveResources: number;
+    connectedResources: number;
+    missingResourceNames: string[];
+    unhealthyResourceNames: string[];
+    ready: boolean;
+  } | null;
 };
 
 export type BookingAutomationReadinessSummary = {
@@ -45,12 +52,7 @@ export function buildBookingAutomationReadinessSummary(
     aiProviderCheck(input.aiBooking),
     pendingWorkCheck(input.pendingWork),
     paymentRulesCheck(input.paymentRules ?? null),
-    {
-      key: "calendar_mapping",
-      label: "Calendarios",
-      status: "info",
-      message: "Las conexiones por recurso se revisan en cada recurso.",
-    },
+    calendarMappingsCheck(input.calendarMappings ?? null),
   ];
 
   if (!bookingReady) {
@@ -62,13 +64,20 @@ export function buildBookingAutomationReadinessSummary(
     };
   }
 
-  if (!liveAllowed || hasOperationalWarning || input.paymentRules?.ready === false) {
+  if (
+    !liveAllowed ||
+    hasOperationalWarning ||
+    input.paymentRules?.ready === false ||
+    input.calendarMappings?.ready === false
+  ) {
     return {
       status: "warning",
       title: "Auto-reservas casi listas",
       message:
         input.paymentRules?.ready === false
           ? "La configuración base está lista, pero faltan reglas de pago en servicios activos."
+          : input.calendarMappings?.ready === false
+            ? "La configuración base está lista, pero faltan calendarios o hay sync fallida."
           : hasOperationalWarning
             ? "La configuración base está lista, pero hay trabajo operativo pendiente."
             : "La configuración base está lista, pero falta marcarla como lista para vivo.",
@@ -166,6 +175,39 @@ function paymentRulesCheck(
     label: "Reglas de pago",
     status: "warning" as const,
     message: `Faltan reglas en ${input.missingServiceNames.length} servicio(s): ${examples}${more}`,
+  };
+}
+
+function calendarMappingsCheck(
+  input: NonNullable<BookingAutomationReadinessInput["calendarMappings"]> | null
+) {
+  if (!input) {
+    return {
+      key: "calendar_mapping",
+      label: "Calendarios",
+      status: "info" as const,
+      message: "Las conexiones por recurso se revisan en cada recurso.",
+    };
+  }
+  if (input.ready) {
+    return {
+      key: "calendar_mapping",
+      label: "Calendarios",
+      status: "ok" as const,
+      message: `${input.connectedResources}/${input.totalActiveResources} recurso(s) activo(s) con calendario conectado.`,
+    };
+  }
+  const missing = input.missingResourceNames.length;
+  const unhealthy = input.unhealthyResourceNames.length;
+  const examples = [...input.missingResourceNames, ...input.unhealthyResourceNames]
+    .slice(0, 3)
+    .join(", ");
+  const more = missing + unhealthy > 3 ? "…" : "";
+  return {
+    key: "calendar_mapping",
+    label: "Calendarios",
+    status: "warning" as const,
+    message: `Faltan ${missing} mapping(s) y ${unhealthy} tienen problemas: ${examples}${more}`,
   };
 }
 
