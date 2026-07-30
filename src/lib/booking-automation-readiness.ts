@@ -35,6 +35,8 @@ export type BookingAutomationReadinessSummary = {
     label: string;
     severity: "blocked" | "warning";
     message: string;
+    actionLabel: string;
+    actionHref: string;
   }>;
   checks: Array<{
     key: string;
@@ -112,6 +114,7 @@ function buildReadinessIssues(checks: BookingAutomationReadinessSummary["checks"
       label: check.label,
       severity: check.status as "blocked" | "warning",
       message: check.message,
+      ...issueAction(check.key),
     }));
 }
 
@@ -119,6 +122,24 @@ function issueSeverityRank(status: BookingAutomationReadinessSummary["checks"][n
   if (status === "blocked") return 0;
   if (status === "warning") return 1;
   return 2;
+}
+
+function issueAction(key: string): { actionLabel: string; actionHref: string } {
+  switch (key) {
+    case "booking_mode":
+    case "ai_provider":
+      return { actionLabel: "Abrir configuración IA", actionHref: "/agent" };
+    case "catalog":
+      return { actionLabel: "Abrir catálogo", actionHref: "#booking-catalog" };
+    case "pending_work":
+      return { actionLabel: "Ver pendientes", actionHref: "#booking-payment-reviews" };
+    case "payment_rules":
+      return { actionLabel: "Configurar pagos", actionHref: "#booking-payment-rules" };
+    case "calendar_mapping":
+      return { actionLabel: "Revisar calendarios", actionHref: "#booking-catalog" };
+    default:
+      return { actionLabel: "Revisar configuración", actionHref: "#booking-readiness" };
+  }
 }
 
 function bookingModeCheck(input: BookingAutomationReadinessInput["aiBooking"]) {

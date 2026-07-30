@@ -514,7 +514,7 @@ function BookingAutomationReadinessCard({
   }
 
   return (
-    <section className="border-b px-6 py-5">
+    <section id="booking-readiness" className="border-b px-6 py-5">
       <div className="rounded-lg border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -593,6 +593,12 @@ function BookingAutomationReadinessCard({
                   <span>
                     {issue.label} — {issue.message}
                   </span>
+                  <Link
+                    href={issue.actionHref}
+                    className="ml-auto shrink-0 font-medium text-brand hover:underline"
+                  >
+                    {issue.actionLabel}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -873,7 +879,7 @@ function PaymentRulesPanel({ services }: { services: CatalogService[] }) {
   }
 
   return (
-    <section className="border-b px-6 py-5">
+    <section id="booking-payment-rules" className="border-b px-6 py-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Reglas de pago</h3>
@@ -1022,7 +1028,7 @@ function ManualPaymentVerificationsPanel({
   }
 
   return (
-    <section className="border-b bg-subtle px-6 py-5">
+    <section id="booking-payment-reviews" className="border-b bg-subtle px-6 py-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Trabajo pendiente de reservas</h3>
@@ -1316,7 +1322,7 @@ function CatalogPanel({
   }
 
   return (
-    <section className="border-b px-6 py-5">
+    <section id="booking-catalog" className="border-b px-6 py-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">

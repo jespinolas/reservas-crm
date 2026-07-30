@@ -107,6 +107,8 @@ describe("buildBookingAutomationReadinessSummary", () => {
         label: "Trabajo pendiente",
         severity: "warning",
         message: "2 pendiente(s) urgentes o sin atender.",
+        actionLabel: "Ver pendientes",
+        actionHref: "#booking-payment-reviews",
       },
     ]);
   });
@@ -142,6 +144,68 @@ describe("buildBookingAutomationReadinessSummary", () => {
     expect(summary.issues.map((issue) => `${issue.severity}:${issue.key}`)).toEqual([
       "blocked:catalog",
       "warning:pending_work",
+    ]);
+    expect(summary.issues.map((issue) => issue.actionHref)).toEqual([
+      "#booking-catalog",
+      "#booking-payment-reviews",
+    ]);
+  });
+
+  it("maps readiness issues to deterministic setup shortcuts", () => {
+    const summary = buildBookingAutomationReadinessSummary({
+      aiBooking: {
+        ready: false,
+        liveBookingAllowed: false,
+        mode: "disabled",
+        checks: [
+          { key: "booking_mode", ok: false, message: "Las reservas con IA están desactivadas" },
+          { key: "catalog", ok: true, message: "Catálogo listo" },
+          { key: "ai_provider", ok: false, message: "Proveedor de IA no configurado" },
+        ],
+      },
+      pendingWork: { total: 0, urgent: 0, expired: 0, stale: 0 },
+      paymentRules: {
+        totalActiveServices: 1,
+        configuredServices: 0,
+        missingServiceNames: ["Spa"],
+        ready: false,
+      },
+      calendarMappings: {
+        totalActiveResources: 1,
+        connectedResources: 0,
+        missingResourceNames: ["Sala 1"],
+        unhealthyResourceNames: [],
+        ready: false,
+      },
+    });
+
+    expect(
+      summary.issues.map((issue) => ({
+        key: issue.key,
+        actionLabel: issue.actionLabel,
+        actionHref: issue.actionHref,
+      }))
+    ).toEqual([
+      {
+        key: "booking_mode",
+        actionLabel: "Abrir configuración IA",
+        actionHref: "/agent",
+      },
+      {
+        key: "ai_provider",
+        actionLabel: "Abrir configuración IA",
+        actionHref: "/agent",
+      },
+      {
+        key: "payment_rules",
+        actionLabel: "Configurar pagos",
+        actionHref: "#booking-payment-rules",
+      },
+      {
+        key: "calendar_mapping",
+        actionLabel: "Revisar calendarios",
+        actionHref: "#booking-catalog",
+      },
     ]);
   });
 
