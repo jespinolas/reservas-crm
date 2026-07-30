@@ -55,6 +55,33 @@ describe("buildBookingReplyDraftActions", () => {
     );
   });
 
+  it("asks for payment evidence without claiming payment or confirmation", () => {
+    const actions = buildBookingReplyDraftActions({
+      session: {
+        status: "awaiting_payment_evidence",
+        resourceId: "res_house_3",
+        serviceId: "rsvc_stay",
+        requestedStartsAt: null,
+        partySize: null,
+        reservationId: null,
+        selectedOptionJsonRedacted: null,
+      },
+      paymentVerification: { status: "waiting_for_evidence" },
+    });
+    const evidenceRequest = actions.find((action) => action.id === "payment_evidence_request");
+
+    expect(evidenceRequest).toEqual(
+      expect.objectContaining({
+        label: "Pedir comprobante",
+      })
+    );
+    expect(actions.map((action) => action.id)).not.toContain("payment_review");
+    expect(evidenceRequest?.text).toContain("enviá el comprobante");
+    expect(evidenceRequest?.text).toContain("todavía no queda confirmada");
+    expect(evidenceRequest?.text).not.toContain("recibimos");
+    expect(evidenceRequest?.text).not.toContain("está confirmada");
+  });
+
   it("creates conservative drafts for payment review and rejected states", () => {
     const review = buildBookingReplyDraftActions({
       session: {
