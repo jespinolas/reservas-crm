@@ -30,6 +30,12 @@ export type BookingAutomationReadinessSummary = {
   status: "ready" | "warning" | "blocked";
   title: string;
   message: string;
+  issues: Array<{
+    key: string;
+    label: string;
+    severity: "blocked" | "warning";
+    message: string;
+  }>;
   checks: Array<{
     key: string;
     label: string;
@@ -54,12 +60,14 @@ export function buildBookingAutomationReadinessSummary(
     paymentRulesCheck(input.paymentRules ?? null),
     calendarMappingsCheck(input.calendarMappings ?? null),
   ];
+  const issues = buildReadinessIssues(checks);
 
   if (!bookingReady) {
     return {
       status: "blocked",
       title: "Auto-reservas no listas",
       message: "Falta completar requisitos básicos antes de vender reservas 24/7.",
+      issues,
       checks,
     };
   }
@@ -81,6 +89,7 @@ export function buildBookingAutomationReadinessSummary(
           : hasOperationalWarning
             ? "La configuración base está lista, pero hay trabajo operativo pendiente."
             : "La configuración base está lista, pero falta marcarla como lista para vivo.",
+      issues,
       checks,
     };
   }
@@ -89,8 +98,27 @@ export function buildBookingAutomationReadinessSummary(
     status: "ready",
     title: "Auto-reservas listas",
     message: "El negocio tiene la base mínima para operar reservas asistidas por IA.",
+    issues,
     checks,
   };
+}
+
+function buildReadinessIssues(checks: BookingAutomationReadinessSummary["checks"]) {
+  return checks
+    .filter((check) => check.status === "blocked" || check.status === "warning")
+    .sort((left, right) => issueSeverityRank(left.status) - issueSeverityRank(right.status))
+    .map((check) => ({
+      key: check.key,
+      label: check.label,
+      severity: check.status as "blocked" | "warning",
+      message: check.message,
+    }));
+}
+
+function issueSeverityRank(status: BookingAutomationReadinessSummary["checks"][number]["status"]) {
+  if (status === "blocked") return 0;
+  if (status === "warning") return 1;
+  return 2;
 }
 
 function bookingModeCheck(input: BookingAutomationReadinessInput["aiBooking"]) {

@@ -36,6 +36,7 @@ describe("buildBookingAutomationReadinessSummary", () => {
       status: "ready",
       title: "Auto-reservas listas",
     });
+    expect(summary.issues).toEqual([]);
     expect(summary.checks.find((check) => check.key === "pending_work")).toMatchObject({
       status: "ok",
     });
@@ -66,6 +67,11 @@ describe("buildBookingAutomationReadinessSummary", () => {
 
     expect(summary.status).toBe("blocked");
     expect(summary.checks.filter((check) => check.status === "blocked").length).toBeGreaterThan(0);
+    expect(summary.issues.map((issue) => issue.severity)).toEqual([
+      "blocked",
+      "blocked",
+      "blocked",
+    ]);
   });
 
   it("warns when pending work is urgent or stale", () => {
@@ -95,6 +101,48 @@ describe("buildBookingAutomationReadinessSummary", () => {
       status: "warning",
       message: "2 pendiente(s) urgentes o sin atender.",
     });
+    expect(summary.issues).toEqual([
+      {
+        key: "pending_work",
+        label: "Trabajo pendiente",
+        severity: "warning",
+        message: "2 pendiente(s) urgentes o sin atender.",
+      },
+    ]);
+  });
+
+  it("prioritizes blocked issues before warning issues", () => {
+    const summary = buildBookingAutomationReadinessSummary({
+      aiBooking: {
+        ready: false,
+        liveBookingAllowed: false,
+        mode: "suggest_only",
+        checks: [
+          { key: "booking_mode", ok: true, message: "Modo de reservas con IA configurado" },
+          { key: "catalog", ok: false, message: "Faltan recursos o servicios activos" },
+          { key: "ai_provider", ok: true, message: "Proveedor de IA configurado" },
+        ],
+      },
+      pendingWork: { total: 1, urgent: 1, expired: 0, stale: 0 },
+      paymentRules: {
+        totalActiveServices: 1,
+        configuredServices: 1,
+        missingServiceNames: [],
+        ready: true,
+      },
+      calendarMappings: {
+        totalActiveResources: 1,
+        connectedResources: 1,
+        missingResourceNames: [],
+        unhealthyResourceNames: [],
+        ready: true,
+      },
+    });
+
+    expect(summary.issues.map((issue) => `${issue.severity}:${issue.key}`)).toEqual([
+      "blocked:catalog",
+      "warning:pending_work",
+    ]);
   });
 
   it("warns when payment-rule coverage is incomplete", () => {

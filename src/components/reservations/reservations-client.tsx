@@ -571,6 +571,34 @@ function BookingAutomationReadinessCard({
           </div>
         </div>
 
+        <div className="mt-3 rounded-md border bg-background p-3">
+          <p className="text-xs font-semibold">Lo que falta</p>
+          {summary.issues.length === 0 ? (
+            <p className="mt-1 text-xs text-text-3">
+              No hay bloqueos ni alertas operativas detectadas.
+            </p>
+          ) : (
+            <ul className="mt-2 grid gap-1.5 text-xs text-text-3">
+              {summary.issues.map((issue) => (
+                <li key={issue.key} className="flex gap-2">
+                  <span
+                    className={
+                      issue.severity === "blocked"
+                        ? "font-semibold text-destructive"
+                        : "font-semibold text-warning"
+                    }
+                  >
+                    {issue.severity === "blocked" ? "Bloqueo" : "Revisar"}:
+                  </span>
+                  <span>
+                    {issue.label} — {issue.message}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {summary.checks.map((check) => (
             <div key={check.key} className="rounded-md border bg-background p-3">
