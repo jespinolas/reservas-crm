@@ -608,6 +608,99 @@ export const reservationStatusHistory = pgTable(
   (t) => [index("reservation_status_history_reservation_idx").on(t.reservationId)]
 );
 
+export const liteBookingRequest = pgTable(
+  "lite_booking_request",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id").references(() => resource.id, {
+      onDelete: "set null",
+    }),
+    serviceId: text("service_id")
+      .notNull()
+      .references(() => reservationService.id),
+    reservationId: text("reservation_id").references(() => reservation.id, {
+      onDelete: "set null",
+    }),
+    status: text("status", {
+      enum: [
+        "new",
+        "needs_reply",
+        "waiting_for_customer",
+        "waiting_for_payment",
+        "confirmed",
+        "declined",
+        "expired",
+      ],
+    })
+      .notNull()
+      .default("new"),
+    customerName: text("customer_name").notNull(),
+    customerPhone: text("customer_phone").notNull(),
+    customerEmail: text("customer_email"),
+    partySize: integer("party_size").notNull().default(1),
+    startsAt: timestamp("starts_at").notNull(),
+    endsAt: timestamp("ends_at").notNull(),
+    customerNote: text("customer_note"),
+    operatorNote: text("operator_note"),
+    paymentStatus: text("payment_status", {
+      enum: [
+        "not_required",
+        "requested",
+        "evidence_received",
+        "approved",
+        "rejected",
+        "expired",
+      ],
+    })
+      .notNull()
+      .default("not_required"),
+    paymentExpectedAmountMinor: integer("payment_expected_amount_minor"),
+    paymentCurrency: text("payment_currency").notNull().default("PYG"),
+    paymentInstructions: text("payment_instructions"),
+    paymentEvidenceRedacted: text("payment_evidence_redacted"),
+    source: text("source").notNull().default("public_lite_page"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("lite_booking_request_org_status_idx").on(t.organizationId, t.status),
+    index("lite_booking_request_org_time_idx").on(t.organizationId, t.startsAt),
+    index("lite_booking_request_org_resource_time_idx").on(
+      t.organizationId,
+      t.resourceId,
+      t.startsAt,
+      t.endsAt
+    ),
+  ]
+);
+
+export const liteBookingRequestEvent = pgTable(
+  "lite_booking_request_event",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    requestId: text("request_id")
+      .notNull()
+      .references(() => liteBookingRequest.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    actorType: text("actor_type", {
+      enum: ["system", "operator", "customer"],
+    }).notNull(),
+    actorId: text("actor_id"),
+    metadataRedacted: jsonb("metadata_redacted"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("lite_booking_request_event_request_idx").on(t.requestId, t.createdAt),
+    index("lite_booking_request_event_org_idx").on(t.organizationId, t.createdAt),
+  ]
+);
+
 export const manualPaymentVerification = pgTable(
   "manual_payment_verification",
   {

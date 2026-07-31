@@ -36,6 +36,8 @@ const prefixes = {
   googleCalendarSync: "gcalsync",
   resourceCalendarMapping: "rcm",
   resourceBusyBlock: "rbb",
+  liteBookingRequest: "lbr",
+  liteBookingRequestEvent: "lbre",
   automationOutbox: "aout",
   aiReplyAttempt: "aira",
 } as const;
