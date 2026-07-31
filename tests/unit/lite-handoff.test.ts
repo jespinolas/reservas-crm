@@ -26,6 +26,24 @@ describe("Lite WhatsApp handoff", () => {
     expect(template.disclaimer).toContain("no envía este mensaje automáticamente");
   });
 
+  it("includes the end date when a Lite booking spans multiple local days", () => {
+    const template = buildLiteHandoffTemplate({
+      kind: "payment_request",
+      businessName: "Casa Quinta",
+      customerName: "Ana",
+      customerPhone: "+595 981 123456",
+      serviceName: "Estadía",
+      resourceName: "Casa 3",
+      startsAt: new Date("2026-08-01T19:00:00.000Z"),
+      endsAt: new Date("2026-08-02T19:00:00.000Z"),
+      partySize: 4,
+      depositDisplay: "Gs. 150.000",
+    });
+
+    expect(template.body).toContain("1 ago. 2026");
+    expect(template.body).toContain("2 ago. 2026");
+  });
+
   it("falls back to copy-only when the phone is not valid", () => {
     expect(normalizePhoneForWaMe("abc")).toBeNull();
     expect(

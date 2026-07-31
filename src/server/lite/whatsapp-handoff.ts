@@ -81,7 +81,14 @@ function formatDateTimeRange(startsAt: Date, endsAt: Date): string {
     timeStyle: "short",
     timeZone: "America/Asuncion",
   });
-  return `${formatter.format(startsAt)} a ${timeFormatter.format(endsAt)}`;
+  const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+    dateStyle: "short",
+    timeZone: "America/Asuncion",
+  });
+  const sameLocalDate = dateFormatter.format(startsAt) === dateFormatter.format(endsAt);
+  return sameLocalDate
+    ? `${formatter.format(startsAt)} a ${timeFormatter.format(endsAt)}`
+    : `${formatter.format(startsAt)} a ${formatter.format(endsAt)}`;
 }
 
 const handoffInputSchema = z.object({

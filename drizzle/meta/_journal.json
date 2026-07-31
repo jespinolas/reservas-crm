@@ -92,6 +92,20 @@
       "when": 1785415200000,
       "tag": "0012_resource_calendar_busy_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785484800000,
+      "tag": "0013_lite_manual_booking_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785488400000,
+      "tag": "0014_lite_operator_leverage",
+      "breakpoints": true
     }
   ]
 }
