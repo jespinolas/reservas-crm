@@ -114,12 +114,20 @@ export function LiteRequestsClient() {
           Bandeja de solicitudes, respuestas para WhatsApp personal, pagos manuales y
           confirmación sin API ni AI.
         </p>
-        <a
-          href="/lite/operator"
-          className="mt-3 inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium"
-        >
-          Abrir centro operativo Lite
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href="/lite/operator"
+            className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium"
+          >
+            Abrir centro operativo Lite
+          </a>
+          <a
+            href="/lite/calendar"
+            className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium"
+          >
+            Ver calendario Lite
+          </a>
+        </div>
       </header>
 
       <section className="border-b bg-subtle px-6 py-4">

@@ -205,6 +205,12 @@ export function LiteOperatorDashboardClient() {
           Agenda, disponibilidad manual, recordatorios, clientes y plata perdida. Sin WABA, sin AI,
           sin envíos automáticos.
         </p>
+        <a
+          href="/lite/calendar"
+          className="mt-3 inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium"
+        >
+          Ver calendario Lite
+        </a>
       </header>
       <main className="min-h-0 flex-1 overflow-auto p-6">
         {message && <p className="mb-4 rounded-md border bg-subtle p-3 text-sm">{message}</p>}

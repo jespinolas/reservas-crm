@@ -14,6 +14,21 @@ importers:
       '@dnd-kit/sortable':
         specifier: ^10.0.0
         version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      '@schedule-x/calendar':
+        specifier: ^4.6.1
+        version: 4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)(temporal-polyfill@1.0.2)
+      '@schedule-x/event-modal':
+        specifier: ^4.6.1
+        version: 4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)
+      '@schedule-x/events-service':
+        specifier: ^4.6.1
+        version: 4.6.1
+      '@schedule-x/react':
+        specifier: ^4.1.0
+        version: 4.1.0(@schedule-x/calendar@4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)(temporal-polyfill@1.0.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@schedule-x/theme-default':
+        specifier: ^4.6.1
+        version: 4.6.1
       better-auth:
         specifier: ^1.1.14
         version: 1.6.23(drizzle-kit@0.30.6)(drizzle-orm@0.38.4(@types/react@19.2.17)(kysely@0.29.3)(postgres@3.4.9)(react@19.2.7))(next@15.5.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@2.1.9(@types/node@22.20.1))
@@ -47,6 +62,9 @@ importers:
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.1
+      temporal-polyfill:
+        specifier: ^1.0.2
+        version: 1.0.2
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -221,11 +239,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild/aix-ppc64@0.19.12':
     resolution: {integrity: sha512-bmoCYyWdEL3wDQIVbcyzRyeKLgk2WtWLTWz1ZIAZF/EGbNOwSA6ew3PftJ1PqMiOOGu0OyFMzG53L0zqIpPeNA==}
@@ -1104,6 +1122,14 @@ packages:
   '@petamoriken/float16@3.9.3':
     resolution: {integrity: sha512-8awtpHXCx/bNpFt4mt2xdkgtgVvKqty8VbjHI/WWWQuEw+KLzFot3f4+LkQY9YmOtq7A5GdOnqoIC8Pdygjk2g==}
 
+  '@preact/signals-core@1.14.4':
+    resolution: {integrity: sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==}
+
+  '@preact/signals@2.10.0':
+    resolution: {integrity: sha512-avH1zQLZR6c0DmH3pT/sn4RIzsNDXAue+MEoyS5RIvApKALSU8m05KyBOL8ua21gxeDYp1DclTMcFd+N1zaL1Q==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
+
   '@rollup/rollup-android-arm-eabi@4.62.2':
     resolution: {integrity: sha512-6o7ZLZK+BeenkZCFNDXqpbjw9bD6nuWonvS/lwQJp7NoVVxm6p3qE7qQ5jGuBjiFsgvqjD8mZAU5oWxTmbOeOg==}
     cpu: [arm]
@@ -1247,6 +1273,32 @@ packages:
 
   '@rushstack/eslint-patch@1.16.1':
     resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
+
+  '@schedule-x/calendar@4.6.1':
+    resolution: {integrity: sha512-qJ1CPtflvTycsBREGt8jYEeeCYPekZS1w32GAgp7SDw/NoRk1qiY6vmE2++d2KwefZoSCsETw7A6tQorCwg+SA==}
+    peerDependencies:
+      '@preact/signals': ^2.0.2
+      preact: ^10.19.2
+      temporal-polyfill: 0.3.0
+
+  '@schedule-x/event-modal@4.6.1':
+    resolution: {integrity: sha512-YWRAjNwi/W0+GPwb6gVif0gQpuxBQ08M8mqwGqBwf9HRwXUZyE36CD9GMF7xtkFvxVEolmq3mG23Dk3IUWR/9Q==}
+    peerDependencies:
+      '@preact/signals': ^2.0.2
+      preact: ^10.19.2
+
+  '@schedule-x/events-service@4.6.1':
+    resolution: {integrity: sha512-bbLXOrOahzqYoC8hB73KZQbk32PnTyAXtv1+VFVKt4Q/2H7bCmS205vlEjLpQuE4uqPo9tr09r3GX7YMSKoDNQ==}
+
+  '@schedule-x/react@4.1.0':
+    resolution: {integrity: sha512-l2hn1kdTModk4Lbt+nEr/VAcuNMA+w+hAAtgz8VLOj5UeieM7PWoK+cDapzPHCjUKisCSPd8QZfAX966Ma82kQ==}
+    peerDependencies:
+      '@schedule-x/calendar': ^3.1.0 || ^4.0.0
+      react: ^16.7.0 || ^17 || ^18 || ^19
+      react-dom: ^16.7.0 || ^17 || ^18 || ^19
+
+  '@schedule-x/theme-default@4.6.1':
+    resolution: {integrity: sha512-kjdMDRc3y+45NpNqHDhd0flfepyCbBKooYiDPI1eRC+1medBYJLQPBtR8mcnVL63MzN6NqwEuWY+YJPdIj+gUA==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2752,6 +2804,14 @@ packages:
     resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
     engines: {node: '>=12'}
 
+  preact@10.29.7:
+    resolution: {integrity: sha512-DCHYrK/B10yUD3ZjLfhZ3WIE/9Vf9VFUODcRE2dRomTYDpJk6z6L9wecSfhfE6M9ZTHUdyQkoC46arIDhEV84Q==}
+    peerDependencies:
+      preact-render-to-string: '>=5'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -2992,6 +3052,15 @@ packages:
     resolution: {integrity: sha512-3ofp+LL8E+pK/JuPLPggVAIaEuhvIz4qNcf3nA1Xn2o/7fb7s/TYpHhwGDv1ZU3PkBluUVaF8PyCHcm48cKLWQ==}
     engines: {node: '>=14.0.0'}
     hasBin: true
+
+  temporal-polyfill@1.0.2:
+    resolution: {integrity: sha512-pTyp/7kfStJQbJ8YOHmcJItkxvOGCZHu3PaVgLvLnxFS7O12EPiWLElnRre/rw77z4TGZX/gvdqMXWn6ispQvA==}
+
+  temporal-spec@1.0.1:
+    resolution: {integrity: sha512-wxVoanmDeavXie1vu2JaQ3WIc3JZnWAOYFBsJyATaVsXsycKYUflGsyBmrRSnoCpZJpwPyr38VpgSUlQ8CbFxg==}
+
+  temporal-utils@1.0.1:
+    resolution: {integrity: sha512-HAixuesxFQIUaQk3ptX2jhfO/FsOkgVkDDMawvp6n/fkB1q6BKfs3lURw9I+pK/2e2e/q/vrLrxmeqauBoyGMQ==}
 
   thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
@@ -3820,6 +3889,13 @@ snapshots:
 
   '@petamoriken/float16@3.9.3': {}
 
+  '@preact/signals-core@1.14.4': {}
+
+  '@preact/signals@2.10.0(preact@10.29.7)':
+    dependencies:
+      '@preact/signals-core': 1.14.4
+      preact: 10.29.7
+
   '@rollup/rollup-android-arm-eabi@4.62.2':
     optional: true
 
@@ -3898,6 +3974,27 @@ snapshots:
   '@rtsao/scc@1.1.0': {}
 
   '@rushstack/eslint-patch@1.16.1': {}
+
+  '@schedule-x/calendar@4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)(temporal-polyfill@1.0.2)':
+    dependencies:
+      '@preact/signals': 2.10.0(preact@10.29.7)
+      preact: 10.29.7
+      temporal-polyfill: 1.0.2
+
+  '@schedule-x/event-modal@4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)':
+    dependencies:
+      '@preact/signals': 2.10.0(preact@10.29.7)
+      preact: 10.29.7
+
+  '@schedule-x/events-service@4.6.1': {}
+
+  '@schedule-x/react@4.1.0(@schedule-x/calendar@4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)(temporal-polyfill@1.0.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@schedule-x/calendar': 4.6.1(@preact/signals@2.10.0(preact@10.29.7))(preact@10.29.7)(temporal-polyfill@1.0.2)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+
+  '@schedule-x/theme-default@4.6.1': {}
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -5513,6 +5610,8 @@ snapshots:
 
   postgres@3.4.9: {}
 
+  preact@10.29.7: {}
+
   prelude-ls@1.2.1: {}
 
   prop-types@15.8.1:
@@ -5869,6 +5968,15 @@ snapshots:
     transitivePeerDependencies:
       - tsx
       - yaml
+
+  temporal-polyfill@1.0.2:
+    dependencies:
+      temporal-spec: 1.0.1
+      temporal-utils: 1.0.1
+
+  temporal-spec@1.0.1: {}
+
+  temporal-utils@1.0.1: {}
 
   thenify-all@1.6.0:
     dependencies:
