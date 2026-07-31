@@ -38,6 +38,9 @@ const prefixes = {
   resourceBusyBlock: "rbb",
   liteBookingRequest: "lbr",
   liteBookingRequestEvent: "lbre",
+  liteAvailabilityBlock: "lab",
+  liteReminderCompletion: "lrc",
+  liteCustomerProfile: "lcp",
   automationOutbox: "aout",
   aiReplyAttempt: "aira",
 } as const;

@@ -701,6 +701,92 @@ export const liteBookingRequestEvent = pgTable(
   ]
 );
 
+export const liteAvailabilityBlock = pgTable(
+  "lite_availability_block",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => resource.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["available", "busy", "tentative", "blocked"],
+    })
+      .notNull()
+      .default("available"),
+    startsAt: timestamp("starts_at").notNull(),
+    endsAt: timestamp("ends_at").notNull(),
+    label: text("label"),
+    operatorNote: text("operator_note"),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("lite_availability_block_org_time_idx").on(t.organizationId, t.startsAt),
+    index("lite_availability_block_org_resource_time_idx").on(
+      t.organizationId,
+      t.resourceId,
+      t.startsAt,
+      t.endsAt
+    ),
+    index("lite_availability_block_org_status_idx").on(t.organizationId, t.status),
+  ]
+);
+
+export const liteReminderCompletion = pgTable(
+  "lite_reminder_completion",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    taskKey: text("task_key").notNull(),
+    taskKind: text("task_kind").notNull(),
+    targetId: text("target_id").notNull(),
+    completedByUserId: text("completed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    completedAt: timestamp("completed_at").notNull().defaultNow(),
+    note: text("note"),
+  },
+  (t) => [
+    uniqueIndex("lite_reminder_completion_org_task_uq").on(t.organizationId, t.taskKey),
+    index("lite_reminder_completion_org_kind_idx").on(t.organizationId, t.taskKind),
+  ]
+);
+
+export const liteCustomerProfile = pgTable(
+  "lite_customer_profile",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    reliability: text("reliability", {
+      enum: ["new", "good", "late_payer", "no_show_risk", "vip", "blocked"],
+    })
+      .notNull()
+      .default("new"),
+    operatorNote: text("operator_note"),
+    lastReviewedAt: timestamp("last_reviewed_at"),
+    reviewedByUserId: text("reviewed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lite_customer_profile_org_phone_uq").on(t.organizationId, t.phone),
+    index("lite_customer_profile_org_reliability_idx").on(t.organizationId, t.reliability),
+  ]
+);
+
 export const manualPaymentVerification = pgTable(
   "manual_payment_verification",
   {
