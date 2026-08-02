@@ -2,11 +2,15 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 
+function visiblePhone(phone: string) {
+  return phone.startsWith("instagram:") ? null : phone;
+}
+
 export function serializeContact(c: typeof schema.contact.$inferSelect) {
   return {
     id: c.id,
     name: c.name,
-    phone: c.phone,
+    phone: visiblePhone(c.phone),
     notes: c.notes,
     archivedAt: c.archivedAt?.toISOString() ?? null,
   };

@@ -230,6 +230,8 @@ export function serializeMessage(m: typeof schema.message.$inferSelect) {
     conversationId: m.conversationId,
     direction: m.direction,
     type: m.type,
+    channel: m.channel,
+    providerMessageId: m.providerMessageId,
     text: m.text,
     status: m.status,
     aiGenerated: m.aiGenerated,

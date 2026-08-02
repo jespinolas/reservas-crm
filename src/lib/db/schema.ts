@@ -166,6 +166,66 @@ export const lead = pgTable(
   ]
 );
 
+export const channelConnection = pgTable(
+  "channel_connection",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    channel: text("channel", { enum: ["instagram"] }).notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    displayName: text("display_name"),
+    username: text("username"),
+    tokenCipher: text("token_cipher").notNull(),
+    tokenIv: text("token_iv").notNull(),
+    tokenTag: text("token_tag").notNull(),
+    status: text("status", {
+      enum: ["connected", "reconnect_required", "disconnected", "error"],
+    })
+      .notNull()
+      .default("connected"),
+    webhookStatus: text("webhook_status").notNull().default("pending"),
+    lastErrorCode: text("last_error_code"),
+    lastErrorMessageRedacted: text("last_error_message_redacted"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("channel_connection_org_channel_uq").on(t.organizationId, t.channel),
+    uniqueIndex("channel_connection_provider_account_uq").on(t.providerAccountId),
+    index("channel_connection_org_idx").on(t.organizationId),
+  ]
+);
+
+export const contactIdentity = pgTable(
+  "contact_identity",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contact.id, { onDelete: "cascade" }),
+    channel: text("channel", { enum: ["instagram"] }).notNull(),
+    providerUserId: text("provider_user_id").notNull(),
+    providerUsername: text("provider_username"),
+    displayName: text("display_name"),
+    lastSeenAt: timestamp("last_seen_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("contact_identity_org_channel_user_uq").on(
+      t.organizationId,
+      t.channel,
+      t.providerUserId
+    ),
+    index("contact_identity_contact_idx").on(t.contactId),
+  ]
+);
+
 export const conversation = pgTable(
   "conversation",
   {
@@ -176,6 +236,15 @@ export const conversation = pgTable(
     contactId: text("contact_id")
       .notNull()
       .references(() => contact.id, { onDelete: "cascade" }),
+    channel: text("channel", { enum: ["whatsapp", "instagram"] })
+      .notNull()
+      .default("whatsapp"),
+    channelConnectionId: text("channel_connection_id").references(
+      () => channelConnection.id,
+      { onDelete: "set null" }
+    ),
+    providerConversationId: text("provider_conversation_id"),
+    serviceWindowExpiresAt: timestamp("service_window_expires_at"),
     /** Conversación del Laboratorio: jamás toca la API de WhatsApp. */
     isTest: boolean("is_test").notNull().default(false),
     aiEnabled: boolean("ai_enabled").notNull().default(true),
@@ -191,9 +260,12 @@ export const conversation = pgTable(
   },
   (t) => [
     // Una conversación real por contacto; las de prueba no compiten.
-    uniqueIndex("conversation_org_contact_real_uq")
-      .on(t.organizationId, t.contactId)
+    uniqueIndex("conversation_org_contact_channel_real_uq")
+      .on(t.organizationId, t.contactId, t.channel)
       .where(sql`${t.isTest} = false`),
+    uniqueIndex("conversation_channel_provider_uq")
+      .on(t.channelConnectionId, t.providerConversationId)
+      .where(sql`${t.providerConversationId} is not null`),
     index("conversation_org_last_idx").on(t.organizationId, t.lastMessageAt),
   ]
 );
@@ -208,8 +280,12 @@ export const message = pgTable(
     conversationId: text("conversation_id")
       .notNull()
       .references(() => conversation.id, { onDelete: "cascade" }),
-    /** ID de WhatsApp — UNIQUE (idempotencia). Nullable en salientes de prueba. */
+    /** ID de WhatsApp — compatibilidad histórica. */
     waMessageId: text("wa_message_id").unique(),
+    providerMessageId: text("provider_message_id"),
+    channel: text("channel", { enum: ["whatsapp", "instagram"] })
+      .notNull()
+      .default("whatsapp"),
     direction: text("direction", { enum: ["in", "out"] }).notNull(),
     type: text("type").notNull().default("text"),
     text: text("text"),
@@ -221,6 +297,7 @@ export const message = pgTable(
     error: text("error"),
     aiGenerated: boolean("ai_generated").notNull().default(false),
     waTimestamp: timestamp("wa_timestamp"),
+    providerTimestamp: timestamp("provider_timestamp"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -229,6 +306,43 @@ export const message = pgTable(
       t.conversationId,
       t.createdAt
     ),
+    uniqueIndex("message_channel_provider_uq")
+      .on(t.channel, t.providerMessageId)
+      .where(sql`${t.providerMessageId} is not null`),
+  ]
+);
+
+export const instagramComment = pgTable(
+  "instagram_comment",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    channelConnectionId: text("channel_connection_id")
+      .notNull()
+      .references(() => channelConnection.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => contact.id, {
+      onDelete: "set null",
+    }),
+    providerCommentId: text("provider_comment_id").notNull(),
+    providerMediaId: text("provider_media_id"),
+    providerUserId: text("provider_user_id"),
+    providerUsername: text("provider_username"),
+    text: text("text"),
+    permalink: text("permalink"),
+    status: text("status", {
+      enum: ["new", "handled", "hidden", "deleted", "failed"],
+    })
+      .notNull()
+      .default("new"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("instagram_comment_provider_uq").on(t.providerCommentId),
+    index("instagram_comment_org_status_idx").on(t.organizationId, t.status),
+    index("instagram_comment_connection_idx").on(t.channelConnectionId, t.createdAt),
   ]
 );
 

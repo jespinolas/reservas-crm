@@ -10,23 +10,9 @@ import {
 } from "@/server/whatsapp/credentials";
 import { isWindowOpen } from "@/server/inbox/window";
 import { serializeMessage } from "@/server/inbox/ingest";
-
-/** Error tipado del envío; `code` mapea a HTTP en la capa de API. */
-export class SendError extends Error {
-  code:
-    | "sandbox_violation"
-    | "not_connected"
-    | "reconnect_required"
-    | "window_closed"
-    | "meta_error"
-    | "meta_unavailable";
-
-  constructor(code: SendError["code"], message: string) {
-    super(message);
-    this.name = "SendError";
-    this.code = code;
-  }
-}
+import { sendInstagramText } from "@/server/instagram/send";
+import { SendError } from "@/server/inbox/send-error";
+export { SendError } from "@/server/inbox/send-error";
 
 type SendResult = { messageId: string };
 
@@ -66,6 +52,10 @@ export async function sendText(input: {
       "sandbox_violation",
       "Conversación de prueba del Laboratorio: el envío real está prohibido"
     );
+  }
+
+  if (row.conversation.channel === "instagram") {
+    return sendInstagramText(input);
   }
 
   if (!isWindowOpen(row.conversation.lastInboundAt)) {

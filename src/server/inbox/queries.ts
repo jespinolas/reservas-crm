@@ -10,7 +10,8 @@ import {
 
 export type ConversationDto = {
   id: string;
-  contact: { id: string; name: string; phone: string };
+  channel: "whatsapp" | "instagram";
+  contact: { id: string; name: string; phone: string | null };
   stageName: string | null;
   aiEnabled: boolean;
   handoffAt: string | null;
@@ -160,7 +161,12 @@ export function serializeConversation(
 ): ConversationDto {
   return {
     id: c.id,
-    contact: { id: contact.id, name: contact.name, phone: contact.phone },
+    channel: c.channel,
+    contact: {
+      id: contact.id,
+      name: contact.name,
+      phone: contact.phone.startsWith("instagram:") ? null : contact.phone,
+    },
     stageName,
     aiEnabled: c.aiEnabled,
     handoffAt: c.handoffAt?.toISOString() ?? null,

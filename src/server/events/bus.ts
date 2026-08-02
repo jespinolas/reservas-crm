@@ -12,7 +12,10 @@ export type SseEvent =
       type: "message.status";
       data: { conversationId: string; messageId: string; status: string };
     }
-  | { type: "conversation.updated"; data: { conversation: unknown } }
+  | {
+      type: "conversation.updated";
+      data: { conversation?: unknown; instagramCommentId?: string };
+    }
   | {
       type: "lab.run";
       data: {

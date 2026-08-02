@@ -43,6 +43,9 @@ const prefixes = {
   liteCustomerProfile: "lcp",
   automationOutbox: "aout",
   aiReplyAttempt: "aira",
+  instagramConnection: "igconn",
+  contactIdentity: "cid",
+  instagramComment: "igc",
 } as const;
 
 export type IdKind = keyof typeof prefixes;
