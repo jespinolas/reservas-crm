@@ -10,6 +10,7 @@ import {
   ClipboardList,
   FlaskConical,
   Inbox,
+  Instagram,
   Kanban,
   LogOut,
   Settings,
@@ -23,6 +24,7 @@ import { useEvents } from "@/components/use-events";
 
 const NAV = [
   { href: "/inbox", label: "Bandeja", icon: Inbox, badge: true },
+  { href: "/instagram/comments", label: "Instagram", icon: Instagram },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/reservations", label: "Reservas", icon: CalendarDays },
   { href: "/lite", label: "Lite Manual", icon: ClipboardList },

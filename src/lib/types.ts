@@ -2,7 +2,8 @@
 
 export type ConversationDto = {
   id: string;
-  contact: { id: string; name: string; phone: string };
+  channel: "whatsapp" | "instagram";
+  contact: { id: string; name: string; phone: string | null };
   stageName: string | null;
   aiEnabled: boolean;
   handoffAt: string | null;

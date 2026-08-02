@@ -362,7 +362,7 @@ export function ContactPanel({
                 {conversation.contact.name}
               </p>
               <p className="text-xs text-text-3">
-                {formatPhone(conversation.contact.phone)}
+                {conversation.contact.phone ? formatPhone(conversation.contact.phone) : "Cuenta de Instagram"}
               </p>
             </div>
           </div>

@@ -291,7 +291,9 @@ export function InboxClient() {
                   >
                     {selected.windowOpen
                       ? "ventana abierta"
-                      : `+${selected.contact.phone}`}
+                      : selected.contact.phone
+                        ? `+${selected.contact.phone}`
+                        : "Cuenta de Instagram"}
                   </p>
                 </div>
               </div>
