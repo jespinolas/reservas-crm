@@ -8,7 +8,11 @@ import {
   Instagram,
   ShieldCheck,
 } from "lucide-react";
-import { instagramCallbackMessage, type InstagramReadiness } from "@/lib/instagram-readiness";
+import {
+  instagramCallbackMessage,
+  type InstagramChecklistItem,
+  type InstagramReadiness,
+} from "@/lib/instagram-readiness";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +33,7 @@ type State = {
     webhookStatus: string;
   } | null;
   readiness: InstagramReadiness;
+  checklist: InstagramChecklistItem[];
 };
 
 export function InstagramConnectionCard() {
@@ -36,6 +41,7 @@ export function InstagramConnectionCard() {
   const [state, setState] = useState<State | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const callbackMessage = useMemo(
@@ -79,6 +85,45 @@ export function InstagramConnectionCard() {
       return;
     }
     window.location.assign(body.authorizationUrl);
+  }
+
+  async function disconnect() {
+    if (
+      !window.confirm(
+        "Esto desconectará Instagram de Reservas CRM. No se eliminarán conversaciones, contactos ni reservas. ¿Continuar?"
+      )
+    ) {
+      return;
+    }
+    setDisconnecting(true);
+    setMessage(null);
+    const response = await fetch("/api/settings/instagram/disconnect", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    }).catch(() => null);
+    const body = (await response?.json().catch(() => null)) as {
+      message?: string;
+      metaRevocationStatus?: string;
+      error?: { message?: string };
+      code?: string;
+    } | null;
+    setDisconnecting(false);
+    if (!response?.ok) {
+      setMessage(
+        body?.error?.message ??
+          body?.message ??
+          body?.code ??
+          "No se pudo desconectar Instagram."
+      );
+      return;
+    }
+    setMessage(
+      body?.metaRevocationStatus === "revoked" ||
+        body?.metaRevocationStatus === "already_revoked"
+        ? "Instagram fue desconectado también en Meta."
+        : "Instagram fue desconectado del CRM. Revisa Meta si quieres quitar el acceso manualmente."
+    );
+    await refresh();
   }
 
   if (!loaded) return <p className="text-sm text-muted-foreground">Cargando…</p>;
@@ -135,6 +180,16 @@ export function InstagramConnectionCard() {
                 <p className="mt-2 text-muted-foreground">
                   {readiness.operatorMessage}
                 </p>
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void disconnect()}
+                    disabled={disconnecting}
+                  >
+                    {disconnecting ? "Desconectando…" : "Desconectar Instagram"}
+                  </Button>
+                </div>
               </div>
               <Badge variant={readiness.badgeVariant}>{readiness.badgeLabel}</Badge>
             </div>
@@ -169,8 +224,46 @@ export function InstagramConnectionCard() {
               cuentas externas.
             </p>
           </div>
+
+          {state?.checklist && state.checklist.length > 0 && (
+            <div className="rounded-md border bg-background/40 p-4 text-sm">
+              <p className="font-medium">Checklist de prueba</p>
+              <div className="mt-3 grid gap-3">
+                {state.checklist.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3">
+                    <Badge
+                      variant={
+                        item.status === "done"
+                          ? "success"
+                          : item.status === "failed"
+                            ? "destructive"
+                            : item.status === "action_required"
+                              ? "warning"
+                              : "secondary"
+                      }
+                      className="mt-0.5"
+                    >
+                      {checklistStatusLabel(item.status)}
+                    </Badge>
+                    <div>
+                      <p className="font-medium">{item.label}</p>
+                      <p className="text-muted-foreground">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
+}
+
+function checklistStatusLabel(status: InstagramChecklistItem["status"]): string {
+  if (status === "done") return "Listo";
+  if (status === "failed") return "Error";
+  if (status === "action_required") return "Acción";
+  if (status === "not_applicable") return "N/A";
+  return "Pendiente";
 }

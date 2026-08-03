@@ -108,3 +108,31 @@ export async function markInstagramReconnectRequired(providerAccountId: string) 
     .set({ status: "reconnect_required", updatedAt: new Date() })
     .where(eq(schema.channelConnection.providerAccountId, providerAccountId));
 }
+
+export async function markInstagramWebhookActive(providerAccountId: string) {
+  await getDb()
+    .update(schema.channelConnection)
+    .set({ webhookStatus: "active", lastErrorCode: null, updatedAt: new Date() })
+    .where(eq(schema.channelConnection.providerAccountId, providerAccountId));
+}
+
+export async function disconnectInstagramByOrg(organizationId: string): Promise<number> {
+  const result = await getDb()
+    .update(schema.channelConnection)
+    .set({
+      status: "disconnected",
+      webhookStatus: "disabled",
+      lastErrorCode: null,
+      lastErrorMessageRedacted: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      scoped(
+        schema.channelConnection.organizationId,
+        organizationId,
+        eq(schema.channelConnection.channel, "instagram")
+      )
+    )
+    .returning({ id: schema.channelConnection.id });
+  return result.length;
+}

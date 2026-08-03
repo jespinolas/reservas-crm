@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildInstagramChecklist,
   buildInstagramReadiness,
   instagramCallbackMessage,
 } from "@/lib/instagram-readiness";
@@ -47,5 +48,34 @@ describe("Instagram readiness mapping", () => {
       message: "Meta rechazó el intercambio de autorización. Intenta conectar de nuevo.",
     });
   });
-});
 
+  it("builds a safe setup checklist for pending webhook delivery", () => {
+    const checklist = buildInstagramChecklist({
+      account: { status: "connected", webhookStatus: "pending" },
+      webhookConfigured: true,
+      signatureConfigured: true,
+    });
+    expect(checklist.find((item) => item.id === "account_connected")).toMatchObject({
+      status: "done",
+    });
+    expect(checklist.find((item) => item.id === "first_event_received")).toMatchObject({
+      status: "pending",
+    });
+    expect(JSON.stringify(checklist)).not.toContain("token");
+    expect(JSON.stringify(checklist)).not.toContain("secret");
+  });
+
+  it("marks first event and DM checklist items done when webhook is active", () => {
+    const checklist = buildInstagramChecklist({
+      account: { status: "connected", webhookStatus: "active" },
+      webhookConfigured: true,
+      signatureConfigured: true,
+    });
+    expect(checklist.find((item) => item.id === "first_event_received")).toMatchObject({
+      status: "done",
+    });
+    expect(checklist.find((item) => item.id === "test_dm_visible")).toMatchObject({
+      status: "done",
+    });
+  });
+});

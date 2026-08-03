@@ -2,7 +2,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { publish } from "@/server/events/bus";
-import { getInstagramCredentialsByAccountId } from "@/server/instagram/credentials";
+import {
+  getInstagramCredentialsByAccountId,
+  markInstagramWebhookActive,
+} from "@/server/instagram/credentials";
 import { maybeRunAgentTurn } from "@/server/ai/trigger";
 
 export type InstagramWebhookPayload = {
@@ -54,6 +57,9 @@ export async function processInstagramWebhook(
     if (!credentials) {
       console.warn("[instagram] event for unknown account ignored");
       continue;
+    }
+    if (credentials.webhookStatus !== "active") {
+      await markInstagramWebhookActive(accountId);
     }
 
     for (const change of entry.changes ?? []) {
