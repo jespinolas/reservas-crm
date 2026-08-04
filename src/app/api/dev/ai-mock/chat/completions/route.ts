@@ -1,1 +1,3 @@
-export { dynamic, POST } from "../../v1/chat/completions/route";
+export const dynamic = "force-dynamic";
+
+export { POST } from "../../v1/chat/completions/route";
