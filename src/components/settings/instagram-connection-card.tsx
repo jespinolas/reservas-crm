@@ -22,6 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SensitiveConfigValue } from "@/components/settings/sensitive-config-value";
 
 type State = {
   connected: boolean;
@@ -175,8 +176,14 @@ export function InstagramConnectionCard() {
                   {account.displayName ?? account.username ?? "Cuenta de Instagram"}
                 </p>
                 <p className="text-muted-foreground">
-                  {account.username ? `@${account.username}` : account.id}
+                  {account.username ? `@${account.username}` : "Cuenta configurada"}
                 </p>
+                <div className="mt-2">
+                  <SensitiveConfigValue
+                    label="ID de cuenta de Instagram"
+                    value={account.id}
+                  />
+                </div>
                 <p className="mt-2 text-muted-foreground">
                   {readiness.operatorMessage}
                 </p>

@@ -1,10 +1,12 @@
 "use client";
 
+import type { ChangeEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  Copy,
+  Eye,
+  EyeOff,
   Info,
   ShieldCheck,
 } from "lucide-react";
@@ -13,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SensitiveConfigValue } from "@/components/settings/sensitive-config-value";
 
 type Connection = {
   wabaId: string;
@@ -75,12 +78,22 @@ export function WhatsappWizard() {
           <CheckCircle2 className="h-5 w-5 text-success" />
           <div className="flex-1 text-sm">
             <p className="font-medium text-[#3f6b52]">
-              Número conectado: {connection.displayPhoneNumber ?? connection.phoneNumberId}
+              Número conectado: {connection.displayPhoneNumber ?? "configurado"}
             </p>
-            <p className="text-[#3f6b52]/80">
-              {connection.verifiedName ? `${connection.verifiedName} · ` : ""}
-              token …{connection.tokenLast4}
-            </p>
+            {connection.verifiedName && (
+              <p className="text-[#3f6b52]/80">{connection.verifiedName}</p>
+            )}
+            <div className="mt-2 grid gap-2">
+              <SensitiveConfigValue
+                label="Phone Number ID"
+                value={connection.phoneNumberId}
+              />
+              <SensitiveConfigValue label="WABA ID" value={connection.wabaId} />
+              <SensitiveConfigValue
+                label="sufijo del token"
+                value={connection.tokenLast4 ? `…${connection.tokenLast4}` : null}
+              />
+            </div>
           </div>
           <Badge variant="success">Conectado</Badge>
         </div>
@@ -205,7 +218,7 @@ function ConnectForm({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="waba-id">WABA ID</Label>
-            <Input
+            <SensitiveInput
               id="waba-id"
               placeholder="ID de la cuenta de WhatsApp Business"
               value={wabaId}
@@ -214,7 +227,7 @@ function ConnectForm({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone-number-id">Phone Number ID</Label>
-            <Input
+            <SensitiveInput
               id="phone-number-id"
               placeholder="ID del número de teléfono"
               value={phoneNumberId}
@@ -268,15 +281,6 @@ function ConnectForm({
 }
 
 function WebhookCard({ webhook }: { webhook: WebhookInfo }) {
-  const [copied, setCopied] = useState<string | null>(null);
-
-  function copy(text: string, which: string) {
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(which);
-      setTimeout(() => setCopied(null), 1500);
-    });
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -302,22 +306,12 @@ function WebhookCard({ webhook }: { webhook: WebhookInfo }) {
         )}
         <div className="space-y-1.5">
           <Label>URL del webhook (callback URL)</Label>
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md border bg-background/60 px-3 py-2 text-xs">
-              {webhook.url}
-            </code>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Copiar URL"
-              onClick={() => copy(webhook.url, "url")}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-            {copied === "url" && (
-              <span className="text-xs text-primary">Copiada ✓</span>
-            )}
-          </div>
+          <SensitiveConfigValue
+            label="URL del webhook"
+            value={webhook.url}
+            copyable
+            copiedLabel="Copiada ✓"
+          />
           <p className="text-xs text-muted-foreground">
             La URL contiene el token secreto en la ruta: trátala como una
             contraseña.
@@ -325,22 +319,11 @@ function WebhookCard({ webhook }: { webhook: WebhookInfo }) {
         </div>
         <div className="space-y-1.5">
           <Label>Verify token</Label>
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md border bg-background/60 px-3 py-2 text-xs">
-              {webhook.verifyToken}
-            </code>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Copiar verify token"
-              onClick={() => copy(webhook.verifyToken, "vt")}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-            {copied === "vt" && (
-              <span className="text-xs text-primary">Copiado ✓</span>
-            )}
-          </div>
+          <SensitiveConfigValue
+            label="verify token"
+            value={webhook.verifyToken}
+            copyable
+          />
         </div>
         {webhook.signatureLayer ? (
           <p className="flex items-center gap-2 text-xs text-success">
@@ -358,5 +341,42 @@ function WebhookCard({ webhook }: { webhook: WebhookInfo }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SensitiveInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  placeholder: string;
+}) {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        id={id}
+        type={revealed ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        autoComplete="off"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label={revealed ? `Ocultar ${id}` : `Mostrar ${id}`}
+        aria-pressed={revealed}
+        onClick={() => setRevealed((current) => !current)}
+      >
+        {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </Button>
+    </div>
   );
 }
