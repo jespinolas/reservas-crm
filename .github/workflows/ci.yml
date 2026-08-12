@@ -37,6 +37,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Test migration utilities
+        run: pnpm test:migration
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
@@ -111,3 +114,34 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  mobile:
+    name: Expo mobile client
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Test
+        working-directory: mobile
+        run: npm test
+
+      - name: Typecheck
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Export web bundle
+        working-directory: mobile
+        run: npm run export:web

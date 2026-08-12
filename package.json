@@ -33,6 +33,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:migration": "node --test scripts/migration/*.test.mjs",
     "test:watch": "vitest",
     "smoke:fresh-install": "bash scripts/fresh-install-smoke.sh",
     "db:generate": "drizzle-kit generate",
