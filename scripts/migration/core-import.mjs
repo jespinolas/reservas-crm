@@ -6,14 +6,14 @@
  *   MIGRATION_ENV=staging ALLOW_MIGRATION_APPLY=YES node ... --apply
  *
  * URLs are read from the environment and are never printed. The importer
- * intentionally migrates contacts, conversations, and messages only; auth,
- * provider secrets, reservations, and integrations need separate approved
- * mappings.
+ * migrates CRM conversations plus the reservation catalog and existing booking
+ * state. Auth, provider secrets, payments, and integrations need separate
+ * approved mappings.
  */
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import postgres from "postgres";
+import { idFingerprint, reservationStatus, timeFromMinutes, uuidFor } from "./core-import-utils.mjs";
 
 const APPLY = process.argv.includes("--apply");
 const sourceUrl = process.env.SOURCE_DATABASE_URL;
@@ -33,18 +33,6 @@ const sourceTables = [
   "organization", "contact", "conversation", "message", "resource",
   "reservation_service", "resource_schedule", "booking_hold", "reservation",
 ];
-
-function uuidFor(kind, sourceId) {
-  const hash = crypto.createHash("sha256").update(`${kind}:${sourceId}`).digest();
-  hash[6] = (hash[6] & 0x0f) | 0x50;
-  hash[8] = (hash[8] & 0x3f) | 0x80;
-  const hex = hash.subarray(0, 16).toString("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function idFingerprint(sourceId) {
-  return crypto.createHash("sha256").update(String(sourceId)).digest("hex").slice(0, 16);
-}
 
 async function inventory() {
   const organizations = await source`select id, name, slug from organization order by id`;
@@ -87,20 +75,6 @@ async function applyCore(manifest) {
   const timezoneByOrganization = new Map(configurations.map((row) => [row.organization_id, row.timezone ?? "America/Asuncion"]));
   const migrationExclusions = [];
 
-  function timeFromMinutes(minutes) {
-    const value = Number(minutes);
-    const hours = Math.floor(value / 60).toString().padStart(2, "0");
-    const remainder = (value % 60).toString().padStart(2, "0");
-    return `${hours}:${remainder}:00`;
-  }
-
-  function reservationStatus(status) {
-    const normalized = String(status ?? "confirmed").toLowerCase();
-    if (normalized === "cancelled") return "CANCELLED";
-    if (normalized === "completed") return "COMPLETED";
-    if (normalized === "no_show") return "NO_SHOW";
-    return "CONFIRMED";
-  }
 
   for (const organization of organizations) {
     const targetOrganizationId = targetBySlug.get(organization.slug);

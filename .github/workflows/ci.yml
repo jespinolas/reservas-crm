@@ -37,6 +37,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Test migration utilities
+        run: pnpm test:migration
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
