@@ -3,6 +3,8 @@ import { apiError, parseBody, withAuth } from "@/lib/api";
 import { getConversation, listMessages } from "@/server/inbox/queries";
 import { serializeMessage } from "@/server/inbox/ingest";
 import { SendError, sendText } from "@/server/inbox/send";
+import { getCoreApiMode } from "@/server/core/config";
+import { coreClientForSession } from "@/server/core/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +12,12 @@ type Params = { params: Promise<{ id: string }> };
 
 export const GET = withAuth(async (session, req: Request, ctx: Params) => {
   const { id } = await ctx.params;
+  if (getCoreApiMode() === "core") {
+    const url = new URL(req.url);
+    const sinceParam = url.searchParams.get("since");
+    const messages = await (await coreClientForSession(session)).listMessages(id);
+    return Response.json({ messages: sinceParam ? messages.filter((message) => !Number.isNaN(new Date(message.createdAt).getTime()) && new Date(message.createdAt) >= new Date(sinceParam)) : messages });
+  }
   const row = await getConversation(session.organizationId, id);
   if (!row) return apiError(404, "not_found", "Conversación no encontrada");
 
@@ -39,6 +47,13 @@ export const POST = withAuth(async (session, req: Request, ctx: Params) => {
   const { id } = await ctx.params;
   const body = await parseBody(req, sendSchema);
   if (!body.ok) return body.response;
+
+  if (getCoreApiMode() === "core") {
+    const idempotencyKey = req.headers.get("Idempotency-Key")?.trim();
+    if (!idempotencyKey) return apiError(400, "idempotency_key_required", "Idempotency-Key is required");
+    const message = await (await coreClientForSession(session)).sendManualReply(id, body.data.text, idempotencyKey);
+    return Response.json({ messageId: message.id });
+  }
 
   try {
     const result = await sendText({
